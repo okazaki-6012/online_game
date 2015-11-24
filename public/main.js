@@ -25,13 +25,15 @@ window.onload = function() {
 		$("#msg_list").prepend("<li>" + msg + "</li>");
 	}
 
-	var myName = Math.floor(Math.random()*10000);
+	var myName = "User" + Math.floor(Math.random()*10000);
 	start(myName)
 
 // === ここまでサーバに向けた処理 ===
 	
     var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
-	
+
+	// メモ：画像に対して横に進んでしまうため、
+	// そもそも入っている画像の向きを変更するなどの処置が必要
 	function preload () {
 		game.load.image('enemy', 'asset/enemy.png');
 		game.load.image('player', 'asset/player.png');
@@ -39,7 +41,7 @@ window.onload = function() {
 
 	var player;
 	var enemy;
-	var SPEED = 50;
+	var SPEED = 100;
 	var ANGLE = 200;
     function create () {
 
@@ -58,6 +60,15 @@ window.onload = function() {
 		player = game.add.sprite(game.world.centerX, game.world.centerY, 'player');
 		game.physics.enable(player, Phaser.Physics.ARCADE);
 		player.anchor.setTo(0.5, 0.5);
+		// 最大HP
+		console.log(player.maxHealth);
+		// HPの回復
+		player.heal(10);
+		// 現在のHP
+		console.log(player.health);
+		// 名前1
+		player.name = myName;
+		console.log(player.name);
     }
 
 	function update() {

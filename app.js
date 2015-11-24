@@ -14,11 +14,11 @@ io.on('connection', function (socket) {
 	// 接続通知をクライアントに送信	
 	socket.on("connected", function (name) {
 		console.log("connect:" + name);
+		userHash[socket.id] = name;
 		console.log("connect_list")
 		for(key in userHash) {
-			console.log( key + " : " + userHash[key]);
+			console.log("> " + key + " : " + userHash[key]);
 		}
-		userHash[socket.id] = name;
 		var msg = name + "が入室しました";
 	    io.sockets.emit("MessageToClient", {value: msg});
 	});
