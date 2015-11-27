@@ -32,8 +32,6 @@ window.onload = function() {
 	
     var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
-	// メモ：画像に対して横に進んでしまうため、
-	// そもそも入っている画像の向きを変更するなどの処置が必要
 	function preload () {
 		game.load.image('enemy', 'asset/enemy.png');
 		game.load.image('player', 'asset/player.png');
@@ -44,22 +42,25 @@ window.onload = function() {
 	var SPEED = 100;
 	var ANGLE = 200;
     function create () {
-
+		// 物理計算方式
+		game.physics.startSystem(Phaser.Physics.P2JS);
+		
 		// キーボードのインプットを登録
-		upKey = game.input.keyboard.addKey(Phaser.Keyboard.UP);
-		downKey = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
-		leftKey = game.input.keyboard.addKey(Phaser.Keyboard.LEFT);
-		rightKey = game.input.keyboard.addKey(Phaser.Keyboard.RIGHT);
+		cursors = game.input.keyboard.createCursorKeys();
 		
 		// スプライトを生成
 		enemy = game.add.sprite(200, 300, 'enemy');
 		// enemyにphyisicsを付与
-		game.physics.enable(enemy, Phaser.Physics.ARCADE);
-
+		game.physics.p2.enable(enemy);
+		// あたり判定 ( 四角形 )
+		enemy.body.setRectangle(40, 40);
+		
 		// playerの設定
 		player = game.add.sprite(game.world.centerX, game.world.centerY, 'player');
-		game.physics.enable(player, Phaser.Physics.ARCADE);
+		game.physics.p2.enable(player);
 		player.anchor.setTo(0.5, 0.5);
+		// あたり判定 ( 円 )
+		player.body.setCircle(28);
 		// 最大HP
 		console.log(player.maxHealth);
 		// HPの回復
@@ -77,15 +78,16 @@ window.onload = function() {
 		player.body.velocity.y = 0;
 		player.body.angularVelocity = 0;
 		
-		if (upKey.isDown){
-			game.physics.arcade.velocityFromAngle(player.angle, SPEED, player.body.velocity);
+		if (cursors.up.isDown){
+			// 角度を-90することで上に向かって移動する
+			player.body.thrust(10000);
 		}
 
 		player.body.angularAcceleration = 0;
-		if (leftKey.isDown){
-			player.body.angularVelocity = -ANGLE;
-		}else if (rightKey.isDown){
-			player.body.angularVelocity = ANGLE;
+		if (cursors.left.isDown){
+			player.body.rotateLeft(100);
+		}else if (cursors.right.isDown){
+			player.body.rotateRight(100);
 		}
 
 		game.physics.arcade.collide(enemy, player, collisionHandler, null, this);
