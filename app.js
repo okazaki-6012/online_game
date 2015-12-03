@@ -11,7 +11,7 @@ var userHash = {};
 
 // クライアント接続があると、以下の処理をさせる。
 io.on('connection', function (socket) {
-	// 接続通知をクライアントに送信	
+	// 接続通知をクライアントに送信
 	socket.on("connected", function (name) {
 		console.log("connect:" + name);
 		userHash[socket.id] = name;
