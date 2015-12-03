@@ -7,19 +7,22 @@ server.listen(8080)
 console.log("starting server");
 
 // ユーザ管理ハッシュ
-var userHash = {};
+var object_list = {};
+var user_list = {};
 
 // クライアント接続があると、以下の処理をさせる。
 io.on('connection', function (socket) {
 	// 接続通知をクライアントに送信
-	socket.on("connected", function (name) {
-		console.log("connect:" + name);
-		userHash[socket.id] = name;
+	socket.on("connected", function (id) {
+		console.log("connect:" + id);
+		object_list[id] = {type: "user", x: 0, y: 0, hp: 1, owner_id: id};
+		user_list[socket.id] = id;
 		console.log("connect_list")
-		for(key in userHash) {
-			console.log("> " + key + " : " + userHash[key]);
+		for(key in user_list) {
+			var u_id = user_list[key];
+			console.log("> " + key + " : " + object_list[u_id]["owner_id"]);
 		}
-		var msg = name + "が入室しました";
+		var msg = id + "が入室しました";
 	    io.sockets.emit("MessageToClient", {value: msg});
 	});
 
@@ -31,12 +34,27 @@ io.on('connection', function (socket) {
 
 	// 接続切れイベントを設定
 	socket.on("disconnect", function () {
-		if (userHash[socket.id]) {
-			var msg = userHash[socket.id] + "が退出しました";
-			delete userHash[socket.id];
+		if (user_list[socket.id]) {
+			var id = user_list[socket.id];
+			var msg = object_list[id]["owner_id"] + "が退出しました";
+			delete object_list[id];
+			delete user_list[socket.id];
 			io.emit("MessageToClient", {value: msg});
 		}
 	});
+
+	// クライアントからの接続受信
+	socket.on("c2s_start", function () {
+		// サーバに保持しているデータを返す
+		io.emit("s2c_start", {value: object_list});
+	});
+
+	// アップデート処理
+	socket.on("c2s_update", function () {
+		// 
+		io.emit("s2c_update", {value: object_list});
+	});
+	
 });
 
 // このファイルがある部分をカレントディレクトリとして

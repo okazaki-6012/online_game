@@ -6,8 +6,10 @@ window.onload = function() {
 	var socket = io.connect(url);
 	
 	// サーバから受け取るイベントを作成
-	socket.on("MessageToClient", function (data) {
-		addMessage(data.value)
+	socket.on("s2c_start", function (data) {
+		for(key in data){
+			console.log(data[key]); // 値が取れない
+		}
 	});
 
 	// ボタンクリック時に、メッセージ送信
@@ -18,16 +20,13 @@ window.onload = function() {
 	  socket.emit("MessageToServer", {value:msg});
 	});
 
-	function start(name) {
-		socket.emit("connected", name);
+	function start(id) {
+		socket.emit("connected", id);
+		socket.emit("c2s_start");
 	}
 
-	function addMessage (msg) {
-		$("#msg_list").prepend("<li>" + msg + "</li>");
-	}
-
-	var myName = "User" + Math.floor(Math.random()*10000);
-	start(myName)
+	var id = "User" + Math.floor(Math.random()*10000);
+	start(id)
 	
 
 // === ゲームに関する処理 ===
@@ -94,9 +93,9 @@ window.onload = function() {
 		energy_bar_bg.lineTo(player.maxEnergy, 0);
 		energy_bar = game.add.graphics(80, 52.5);
 		
-		// 名前
-		player.name = myName;
-		console.log(player.name);
+		// ユーザID
+		player.id = id;
+		console.log(player.id);
 
 		// テキスト
 		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
