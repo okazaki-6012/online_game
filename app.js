@@ -12,20 +12,6 @@ var user_list = {};
 
 // クライアント接続があると、以下の処理をさせる。
 io.on('connection', function (socket) {
-	// 接続通知をクライアントに送信
-	socket.on("connected", function (id) {
-		console.log("connect:" + id);
-		object_list[id] = {type: "user", x: 0, y: 0, hp: 1, owner_id: id};
-		user_list[socket.id] = id;
-		console.log("connect_list")
-		for(key in user_list) {
-			var u_id = user_list[key];
-			console.log("> " + key + " : " + object_list[u_id]["owner_id"]);
-		}
-		var msg = id + "が入室しました";
-	    io.sockets.emit("MessageToClient", {value: msg});
-	});
-
 	// クライアントからの受信イベントを設定
 	socket.on("MessageToServer", function (data) {
 		io.emit("MessageToClient", {value:data.value});
@@ -36,23 +22,32 @@ io.on('connection', function (socket) {
 	socket.on("disconnect", function () {
 		if (user_list[socket.id]) {
 			var id = user_list[socket.id];
-			var msg = object_list[id]["owner_id"] + "が退出しました";
 			delete object_list[id];
 			delete user_list[socket.id];
-			io.emit("MessageToClient", {value: msg});
 		}
 	});
 
 	// クライアントからの接続受信
-	socket.on("c2s_start", function () {
+	socket.on("c2s_start", function ( id ) {
 		// サーバに保持しているデータを返す
-		io.emit("s2c_start", {value: object_list});
+		io.emit("s2c_start", {object_list: object_list});
+		console.log("connect:" + id);
+		object_list[id] = {type: "user", x: 0, y: 0, health: 1, owner_id: id};
+		user_list[socket.id] = id;
+		console.log("connect_list");
+		for(key in user_list) {
+			var u_id = user_list[key];
+			console.log("> " + key + " : " + object_list[u_id]["owner_id"]);
+		}
 	});
 
 	// アップデート処理
-	socket.on("c2s_update", function () {
-		// 
-		io.emit("s2c_update", {value: object_list});
+	socket.on("c2s_update", function ( player ) {
+		var id = user_list[socket.id];
+		object_list[id].x = player.position.x;
+		object_list[id].y = player.position.y;
+		object_list[id].health = player.health;
+		io.emit("s2c_update", {object_list: object_list});
 	});
 	
 });

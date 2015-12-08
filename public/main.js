@@ -4,40 +4,36 @@ window.onload = function() {
 	var url = "http://192.168.8.89:8080";
 	// 接続
 	var socket = io.connect(url);
-	
-	// サーバから受け取るイベントを作成
+
+	var object_list;
+	// サーバからデータを受け取る
 	socket.on("s2c_start", function (data) {
-		for(key in data){
-			console.log(data[key]); // 値が取れない
-		}
+		create_objects(data.object_list);
 	});
 
-	// ボタンクリック時に、メッセージ送信
-	$("input#send").click(function(){
-	  var msg = $("#message").val();
-	  $("#message").val("");
-	  // サーバへ送信
-	  socket.emit("MessageToServer", {value:msg});
+	// サーバから受け取るイベントを作成
+	socket.on("s2c_update", function (data) {
+		object_list = data.object_list;
 	});
 
 	function start(id) {
-		socket.emit("connected", id);
-		socket.emit("c2s_start");
+		socket.emit("c2s_start", id);
 	}
 
-	var id = "User" + Math.floor(Math.random()*10000);
-	start(id)
+	var player_id = "User" + Math.floor(Math.random()*10000);
+	start(player_id);
 	
 
 // === ゲームに関する処理 ===
-    var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
-
+	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+	
+// 素材読み込み
 	function preload () {
 		game.load.image('enemy', 'asset/enemy.png');
 		game.load.image('player', 'asset/player.png');
 	}
 
-	var player, enemy, energy_bar, hp_bar;
+	var player, enemys = {}, energy_bar, hp_bar;
 	var ANGLE = 200;
 	var BOOST_POWER = 5000;	
 	var USE_ENERGY = 20;	
@@ -48,16 +44,8 @@ window.onload = function() {
 		// キーボードのインプットを登録
 		keys = game.input.keyboard.createCursorKeys();
 
-		// スプライトを生成
-		enemy = game.add.sprite(200, 300, 'enemy');
-		enemy.scale.setTo(0.3, 0.3);
-		// enemyにphyisicsを付与
-		game.physics.p2.enable(enemy);
-		// あたり判定 ( 四角形 )
-		enemy.body.setRectangle(20, 80);
-		
 		// playerの設定
-		player = game.add.sprite(game.world.centerX, game.world.centerY, 'player');
+		player = game.add.sprite( Math.floor(Math.random() * 800), Math.floor(Math.random() * 600), 'player' );
 		game.physics.p2.enable(player);
 		player.scale.setTo(0.3, 0.3);
 		player.anchor.setTo(0.5, 0.5);
@@ -94,13 +82,38 @@ window.onload = function() {
 		energy_bar = game.add.graphics(80, 52.5);
 		
 		// ユーザID
-		player.id = id;
+		player.id = player_id;
+		player.type = "user";
 		console.log(player.id);
+		console.log(Object.keys(player));
 
 		// テキスト
 		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
 		// ゲーム内時間
 		game.time.events.loop(Phaser.Timer.SECOND, game_time, this);
+	}
+
+	// ほかのユーザなどを作成
+	function create_objects( data ){
+		for(key in data){
+			if(data[key].owner_id != player_id){
+				switch (data[key].type){
+				case "user": 
+					// スプライトを生成
+					var id = data[key].owner_id;
+					enemys[id] = game.add.sprite(data[key].x, data[key].y, 'enemy');
+					enemys[id].scale.setTo(0.3, 0.3);
+					// enemyにphyisicsを付与
+					game.physics.p2.enable(enemys[id]);
+					// あたり判定 ( 四角形 )
+					enemys[id].body.setRectangle(20, 80);
+					enemys[id].id = id;
+					break;
+				default:
+					break;
+				}
+			}
+		}
 	}
 
 	// プレイヤーメソッド
@@ -119,6 +132,8 @@ window.onload = function() {
 		if(player.health < player.maxHealth){
 			player.health += 0.2;
 		}
+		// 更新処理 error
+		socket.emit("c2s_update", {position: player.position, health: player.health});
     }
 	
 	function update() {
