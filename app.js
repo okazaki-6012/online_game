@@ -12,6 +12,10 @@ var user_list = {};
 
 // クライアント接続があると、以下の処理をさせる。
 io.on('connection', function (socket) {
+
+	// サーバに保持しているデータを返す
+	io.emit("s2c_start", {object_list: object_list});
+
 	// クライアントからの受信イベントを設定
 	socket.on("MessageToServer", function (data) {
 		io.emit("MessageToClient", {value:data.value});
@@ -23,16 +27,17 @@ io.on('connection', function (socket) {
 		if (user_list[socket.id]) {
 			var id = user_list[socket.id];
 			delete object_list[id];
+			for(key in object_list){
+				if(object_list[key].owner_id == id) delete object_list[key];
+			}
 			delete user_list[socket.id];
 		}
 	});
 
 	// クライアントからの接続受信
 	socket.on("c2s_start", function ( id ) {
-		// サーバに保持しているデータを返す
-		io.emit("s2c_start", {object_list: object_list});
 		console.log("connect:" + id);
-		object_list[id] = {type: "user", x: 0, y: 0, health: 1, owner_id: id};
+		object_list[id] = {type: "user", owner_id: id};
 		user_list[socket.id] = id;
 		console.log("connect_list");
 		for(key in user_list) {
@@ -42,14 +47,23 @@ io.on('connection', function (socket) {
 	});
 
 	// アップデート処理
-	socket.on("c2s_update", function ( player ) {
+	socket.on("c2s_update", function ( objects ) {
 		var id = user_list[socket.id];
-		object_list[id].x = player.position.x;
-		object_list[id].y = player.position.y;
-		object_list[id].health = player.health;
-		io.emit("s2c_update", {object_list: object_list});
+		for(key in objects){
+			var object_id = objects[key].owner_id;
+			console.log(objects[key]);
+			if(object_list[object_id]){
+				console.log("true");
+				object_list[object_id].x = objects[key].position.x;
+				object_list[object_id].y = objects[key].position.y;
+				object_list[object_id].health = objects[key].health;
+			}else{
+				object_list[object_id].type = objects[key].type;
+				object_list[object_id].owner_id = id;
+			}
+		}
+		socket.broadcast.emit("s2c_update", {object_list: object_list});
 	});
-	
 });
 
 // このファイルがある部分をカレントディレクトリとして

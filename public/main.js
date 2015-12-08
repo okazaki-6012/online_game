@@ -5,15 +5,34 @@ window.onload = function() {
 	// 接続
 	var socket = io.connect(url);
 
-	var object_list;
 	// サーバからデータを受け取る
-	socket.on("s2c_start", function (data) {
-		create_objects(data.object_list);
+	socket.on("s2c_start", function (data){
+		var object_list = data.object_list;
+		for(key in object_list){
+			if(object_list[key].owner_id != player_id){
+				create_object(object_list[key]);
+			}
+		}
 	});
 
 	// サーバから受け取るイベントを作成
 	socket.on("s2c_update", function (data) {
-		object_list = data.object_list;
+		var object_list = data.object_list;
+		for(key in object_list){
+			console.log(key);
+			// 無かったら作成、あったら更新
+			if(objects[key]){
+				objects[key].x = object_list[key].x;
+				objects[key].y = object_list[key].y;
+				console.log("object_move");
+			}else if(key != player_id){
+				create_object(object_list[key]);
+			}
+		}
+		// 存在しないものを削除
+		for(key in objects){
+			if(!(object_list[key])) objects[key].kill();
+		}
 	});
 
 	function start(id) {
@@ -33,7 +52,7 @@ window.onload = function() {
 		game.load.image('player', 'asset/player.png');
 	}
 
-	var player, enemys = {}, energy_bar, hp_bar;
+	var player, objects = {}, energy_bar, hp_bar;
 	var ANGLE = 200;
 	var BOOST_POWER = 5000;	
 	var USE_ENERGY = 20;	
@@ -45,7 +64,7 @@ window.onload = function() {
 		keys = game.input.keyboard.createCursorKeys();
 
 		// playerの設定
-		player = game.add.sprite( Math.floor(Math.random() * 800), Math.floor(Math.random() * 600), 'player' );
+		player = game.add.sprite( Math.floor(Math.random() * 800 + 20), Math.floor(Math.random() * 600 + 20), 'player' );
 		game.physics.p2.enable(player);
 		player.scale.setTo(0.3, 0.3);
 		player.anchor.setTo(0.5, 0.5);
@@ -94,25 +113,21 @@ window.onload = function() {
 	}
 
 	// ほかのユーザなどを作成
-	function create_objects( data ){
-		for(key in data){
-			if(data[key].owner_id != player_id){
-				switch (data[key].type){
-				case "user": 
-					// スプライトを生成
-					var id = data[key].owner_id;
-					enemys[id] = game.add.sprite(data[key].x, data[key].y, 'enemy');
-					enemys[id].scale.setTo(0.3, 0.3);
-					// enemyにphyisicsを付与
-					game.physics.p2.enable(enemys[id]);
-					// あたり判定 ( 四角形 )
-					enemys[id].body.setRectangle(20, 80);
-					enemys[id].id = id;
-					break;
-				default:
-					break;
-				}
-			}
+	function create_object( data ){
+		switch (data.type){
+		case "user": 
+			// スプライトを生成
+			var id = data.owner_id;
+			objects[id] = game.add.sprite(data.x, data.y, 'enemy');
+			objects[id].scale.setTo(0.3, 0.3);
+			// enemyにphyisicsを付与
+			game.physics.p2.enable(objects[id]);
+			// あたり判定 ( 四角形 )
+			objects[id].body.setRectangle(20, 80);
+			objects[id].id = id;
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -132,8 +147,6 @@ window.onload = function() {
 		if(player.health < player.maxHealth){
 			player.health += 0.2;
 		}
-		// 更新処理 error
-		socket.emit("c2s_update", {position: player.position, health: player.health});
     }
 	
 	function update() {
@@ -147,6 +160,10 @@ window.onload = function() {
 			player.body.rotateRight(100);
 		}
 		player.body.angularAcceleration = 0;
+
+		// 更新処理
+		var local_objects = {player_id: {type: player.type, position: player.position, health: player.health, owner_id: player_id}};
+		socket.emit("c2s_update", local_objects);
 	}
 
 	// 一秒ごとの処理
