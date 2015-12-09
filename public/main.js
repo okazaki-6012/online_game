@@ -1,47 +1,33 @@
 window.onload = function() {
 // === サーバに関する処理 ===
 	// 接続先の指定(192.168.8.89)
-	var url = "http://192.168.8.89:8080";
+	// var url = "http://192.168.8.89:8080";
+	var url = "http://" + window.location.hostname + ":8080";
 	// 接続
 	var socket = io.connect(url);
-
-	// サーバからデータを受け取る
-	socket.on("s2c_start", function (data){
-		var object_list = data.object_list;
-		for(key in object_list){
-			if(object_list[key].owner_id != player_id){
-				create_object(object_list[key]);
-			}
-		}
-	});
-
-	// サーバから受け取るイベントを作成
-	socket.on("s2c_update", function (data) {
-		var object_list = data.object_list;
-		for(key in object_list){
-			console.log(key);
-			// 無かったら作成、あったら更新
-			if(objects[key]){
-				objects[key].x = object_list[key].x;
-				objects[key].y = object_list[key].y;
-				console.log("object_move");
-			}else if(key != player_id){
-				create_object(object_list[key]);
-			}
-		}
-		// 存在しないものを削除
-		for(key in objects){
-			if(!(object_list[key])) objects[key].kill();
-		}
-	});
-
-	function start(id) {
-		socket.emit("c2s_start", id);
-	}
-
-	var player_id = "User" + Math.floor(Math.random()*10000);
-	start(player_id);
+	var player_id = "User" + Math.floor(Math.random()*10000);;
+	var object_list;
 	
+	function socket_init(){
+		// サーバからデータを受け取る
+		socket.on("s2c_start", function (data){
+			object_list = data.object_list;
+			// 
+			for(key in objects){
+				if(object_list[key]) console.log(objects[key]);
+			}
+		});
+
+		// サーバからデータを受け取り更新
+		socket.on("s2c_update", function (data) {
+			object_list = data.object_list;
+		});
+
+		function start(id) {
+			socket.emit("c2s_start", id);
+		}
+		start(player_id);
+	}
 
 // === ゲームに関する処理 ===
 	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
@@ -57,6 +43,7 @@ window.onload = function() {
 	var BOOST_POWER = 5000;	
 	var USE_ENERGY = 20;	
     function create () {
+		game.stage.disableVisibilityChange = true;
 		// 物理計算方式
 		game.physics.startSystem(Phaser.Physics.P2JS);
 		
@@ -110,6 +97,7 @@ window.onload = function() {
 		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
 		// ゲーム内時間
 		game.time.events.loop(Phaser.Timer.SECOND, game_time, this);
+		socket_init();
 	}
 
 	// ほかのユーザなどを作成
@@ -125,6 +113,7 @@ window.onload = function() {
 			// あたり判定 ( 四角形 )
 			objects[id].body.setRectangle(20, 80);
 			objects[id].id = id;
+			console.log(objects[id]);
 			break;
 		default:
 			break;
@@ -150,6 +139,7 @@ window.onload = function() {
     }
 	
 	function update() {
+		
 		player.body.angularVelocity = 0;
 		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
@@ -162,8 +152,26 @@ window.onload = function() {
 		player.body.angularAcceleration = 0;
 
 		// 更新処理
-		var local_objects = {player_id: {type: player.type, position: player.position, health: player.health, owner_id: player_id}};
+		var local_objects = {};
+		local_objects[player_id] = {type: player.type, position: player.position, rotation: player.rotation, health: player.health, owner_id: player_id};
 		socket.emit("c2s_update", local_objects);
+		for(key in object_list){
+			// 無かったら作成、あったら更新
+			if(key != player_id){
+				// 既存にあるものは弾く
+				if(jQuery.isEmptyObject(objects[key])){
+					create_object(object_list[key]);
+				}else{
+					objects[key].body.x = object_list[key].x;
+					objects[key].body.y = object_list[key].y;
+					objects[key].body.rotation = object_list[key].rotation;
+				}
+			}
+		}
+		// サーバに存在しないものを削除
+		for(key in objects){
+			if(!(object_list[key])) objects[key].kill();
+		}
 	}
 
 	// 一秒ごとの処理
