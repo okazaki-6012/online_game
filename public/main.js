@@ -8,9 +8,9 @@ window.onload = function() {
 	var player_id = "User" + Math.floor(Math.random()*10000);;
 	var object_list;
 	
-	function socket_init(){
+	function SocketInit(){
 		// サーバからデータを受け取る
-		socket.on("s2c_start", function (data){
+		socket.on("S2C_Start", function (data){
 			object_list = data.object_list;
 			// 
 			for(key in objects){
@@ -19,21 +19,21 @@ window.onload = function() {
 		});
 
 		// サーバからデータを受け取り更新
-		socket.on("s2c_update", function (data) {
+		socket.on("S2C_Update", function (data) {
 			object_list = data.object_list;
 		});
 
-		function start(id) {
-			socket.emit("c2s_start", id);
+		function Start(id) {
+			socket.emit("C2S_Start", id);
 		}
-		start(player_id);
+		Start(player_id);
 	}
 
 // === ゲームに関する処理 ===
-	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: Preload, create: Create, update: Update });
 	
 // 素材読み込み
-	function preload () {
+	function Preload () {
 		game.load.image('enemy', 'asset/enemy.png');
 		game.load.image('player', 'asset/player.png');
 	}
@@ -42,7 +42,7 @@ window.onload = function() {
 	var ANGLE = 200;
 	var BOOST_POWER = 5000;	
 	var USE_ENERGY = 20;	
-    function create () {
+    function Create () {
 		game.stage.disableVisibilityChange = true;
 		// 物理計算方式
 		game.physics.startSystem(Phaser.Physics.P2JS);
@@ -57,9 +57,9 @@ window.onload = function() {
 		player.anchor.setTo(0.5, 0.5);
 		player.body.setRectangle(20, 80);
 		// プレイヤーの移動処理
-		keys.up.onDown.add(player_move, this);
+		keys.up.onDown.add(PlayerMove, this);
 		// プレイヤーの回復処理
-		game.time.events.loop(Phaser.Timer.QUARTER, player_recovery, this);
+		game.time.events.loop(Phaser.Timer.QUARTER, PlayerRecovery, this);
 		// あたり判定 ( 円 )
 		// player.body.setCircle(25);
 		
@@ -93,15 +93,16 @@ window.onload = function() {
 		console.log(player.id);
 		console.log(Object.keys(player));
 
+		// 弾
+		space_button = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+		
 		// テキスト
 		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
-		// ゲーム内時間
-		game.time.events.loop(Phaser.Timer.SECOND, game_time, this);
-		socket_init();
+		SocketInit();
 	}
 
 	// ほかのユーザなどを作成
-	function create_object( data ){
+	function CreateObject( data ){
 		switch (data.type){
 		case "user": 
 			// スプライトを生成
@@ -121,14 +122,14 @@ window.onload = function() {
 	}
 
 	// プレイヤーメソッド
-	function player_move(){
+	function PlayerMove(){
 		if (player.energy - USE_ENERGY >= 0 ){
 			player.energy -= USE_ENERGY;
 			player.body.thrust(BOOST_POWER);
 		}
 	}
 
-	function player_recovery(){
+	function PlayerRecovery(){
 	    // Energyの回復
 		if(player.energy < player.maxEnergy){
 			player.energy++;
@@ -137,8 +138,11 @@ window.onload = function() {
 			player.health += 0.2;
 		}
     }
+
+	function fire(){
+	}
 	
-	function update() {
+	function Update() {
 		
 		player.body.angularVelocity = 0;
 		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
@@ -151,16 +155,20 @@ window.onload = function() {
 		}
 		player.body.angularAcceleration = 0;
 
+		if(space_button.isDown){
+			console.log("space");
+		}
+
 		// 更新処理
 		var local_objects = {};
 		local_objects[player_id] = {type: player.type, position: player.position, rotation: player.rotation, health: player.health, owner_id: player_id};
-		socket.emit("c2s_update", local_objects);
+		socket.emit("C2S_Update", local_objects);
 		for(key in object_list){
 			// 無かったら作成、あったら更新
 			if(key != player_id){
 				// 既存にあるものは弾く
 				if(jQuery.isEmptyObject(objects[key])){
-					create_object(object_list[key]);
+					CreateObject(object_list[key]);
 				}else{
 					objects[key].body.x = object_list[key].x;
 					objects[key].body.y = object_list[key].y;
@@ -172,10 +180,6 @@ window.onload = function() {
 		for(key in objects){
 			if(!(object_list[key])) objects[key].kill();
 		}
-	}
-
-	// 一秒ごとの処理
-	function game_time() {
 	}
 	
 	// イベントハンドラ（コールバック関数）

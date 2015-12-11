@@ -14,10 +14,10 @@ var user_list = {};
 io.on('connection', function (socket) {
 
 	// サーバに保持しているデータを返す
-	io.emit("s2c_start", {object_list: object_list});
+	io.emit("S2C_Start", {object_list: object_list});
 
 	// クライアントからの接続受信
-	socket.on("c2s_start", function ( id ) {
+	socket.on("C2S_Start", function ( id ) {
 		console.log("connect:" + id);
 		object_list[id] = {type: "user", owner_id: id};
 		user_list[socket.id] = id;
@@ -29,7 +29,7 @@ io.on('connection', function (socket) {
 	});
 
 	// アップデート処理
-	socket.on("c2s_update", function ( objects ) {
+	socket.on("C2S_Update", function ( objects ) {
 		var id = user_list[socket.id];
 		for(key in objects){
 			if(object_list[key]){
@@ -43,7 +43,7 @@ io.on('connection', function (socket) {
 				object_list[key].owner_id = id;
 			}
 		}
-		socket.broadcast.emit("s2c_update", {object_list: object_list});
+		socket.broadcast.emit("S2C_Update", {object_list: object_list});
 	});
 
 	// 接続切れイベントを設定
