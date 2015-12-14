@@ -36,12 +36,48 @@ window.onload = function() {
 	function Preload () {
 		game.load.image('enemy', 'asset/enemy.png');
 		game.load.image('player', 'asset/player.png');
+		game.load.image('bullet', 'asset/bullet.png');
 	}
 
 	var player, objects = {}, energy_bar, hp_bar;
 	var ANGLE = 200;
 	var BOOST_POWER = 5000;	
-	var USE_ENERGY = 20;	
+	var USE_ENERGY = 20;
+
+	function CreateRocket ( x, y, image_name ){
+		var rocket = {};
+		// スプライト設定
+		rocket = game.add.sprite(x, y, image_name);
+		// 物理演算
+		game.physics.p2.enable(rocket);
+		// 画像サイズ
+		rocket.scale.setTo(0.3, 0.3);
+		// 中心
+		rocket.anchor.setTo(0.5, 0.5);
+		// あたり判定
+		rocket.body.setRectangle(20, 80);
+		return rocket;
+	}
+
+	function CreateBullet ( x, y, rotate ){
+		var bullet = {};
+		// スプライト設定
+		bullet = game.add.sprite(x, y - 70, 'bullet');
+		// 物理演算
+		game.physics.p2.enable(bullet);
+		// 画像サイズ
+		bullet.scale.setTo(0.25, 0.25);
+		// 中心
+		bullet.anchor.setTo(0.5, 0.5);
+		// あたり判定
+		bullet.body.setRectangle(10, 20);
+		// 向き
+		bullet.body.rotation = rotate;
+		// 発射
+		bullet.body.thrust(15000);
+		return bullet;
+	}
+	
     function Create () {
 		game.stage.disableVisibilityChange = true;
 		// 物理計算方式
@@ -49,13 +85,8 @@ window.onload = function() {
 		
 		// キーボードのインプットを登録
 		keys = game.input.keyboard.createCursorKeys();
-
 		// playerの設定
-		player = game.add.sprite( Math.floor(Math.random() * 800 + 20), Math.floor(Math.random() * 600 + 20), 'player' );
-		game.physics.p2.enable(player);
-		player.scale.setTo(0.3, 0.3);
-		player.anchor.setTo(0.5, 0.5);
-		player.body.setRectangle(20, 80);
+		player = CreateRocket( Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), 'player' );
 		// プレイヤーの移動処理
 		keys.up.onDown.add(PlayerMove, this);
 		// プレイヤーの回復処理
@@ -93,8 +124,9 @@ window.onload = function() {
 		console.log(player.id);
 		console.log(Object.keys(player));
 
-		// 弾
-		space_button = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+		// スペースキー
+		space_button = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR).onDown.add(BulletFire, this);
+		console.log(space_button);
 		
 		// テキスト
 		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
@@ -103,16 +135,11 @@ window.onload = function() {
 
 	// ほかのユーザなどを作成
 	function CreateObject( data ){
+		var id = data.owner_id;
 		switch (data.type){
 		case "user": 
 			// スプライトを生成
-			var id = data.owner_id;
-			objects[id] = game.add.sprite(data.x, data.y, 'enemy');
-			objects[id].scale.setTo(0.3, 0.3);
-			// enemyにphyisicsを付与
-			game.physics.p2.enable(objects[id]);
-			// あたり判定 ( 四角形 )
-			objects[id].body.setRectangle(20, 80);
+			objects[id] = CreateRocket(data.x, data.y, 'enemy');
 			objects[id].id = id;
 			console.log(objects[id]);
 			break;
@@ -139,7 +166,9 @@ window.onload = function() {
 		}
     }
 
-	function fire(){
+	function BulletFire(){
+		console.log("BulletFire");
+		CreateBullet(player.position.x, player.position.y, player.rotation);
 	}
 	
 	function Update() {
@@ -154,10 +183,6 @@ window.onload = function() {
 			player.body.rotateRight(100);
 		}
 		player.body.angularAcceleration = 0;
-
-		if(space_button.isDown){
-			console.log("space");
-		}
 
 		// 更新処理
 		var local_objects = {};

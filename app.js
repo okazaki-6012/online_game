@@ -12,7 +12,8 @@ var user_list = {};
 
 // クライアント接続があると、以下の処理をさせる。
 io.on('connection', function (socket) {
-
+	var user_num = Object.keys(user_list).length+1;
+	console.log("接続数：" + user_num);
 	// サーバに保持しているデータを返す
 	io.emit("S2C_Start", {object_list: object_list});
 
