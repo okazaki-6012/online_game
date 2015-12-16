@@ -8,26 +8,26 @@ window.onload = function() {
 	var player_id = "User" + Math.floor(Math.random()*10000);;
 	var object_list, local_objects = {};
 	
-	function SocketInit(){
+	function socketInit(){
 		// サーバからデータを受け取る
-		socket.on("S2C_Start", function (data){
+		socket.on("s2c_Start", function (data){
 			object_list = data.object_list;
 			for(key in object_list){
 				// 情報を受けて生成
-				local_objects[key] = CreateObject(object_list[key]);
+				local_objects[key] = createObject(object_list[key]);
 			}
 			console.log(local_objects);
 		});
 
 		// サーバからデータを受け取り更新
-		socket.on("S2C_Update", function (data) {
+		socket.on("s2c_Update", function (data) {
 			object_list = data.object_list;
 			// サーバのデータを元に更新と生成
 			for(key in object_list){
 				if(key != player_id){
 					// 既存にあるものは弾く
 					if(jQuery.isEmptyObject(local_objects[key])){
-						CreateObject(object_list[key]);
+						createObject(object_list[key]);
 					}else{
 						local_objects[key].body.x = object_list[key].x;
 						local_objects[key].body.y = object_list[key].y;
@@ -47,16 +47,16 @@ window.onload = function() {
 		});
 
 		function Start(id) {
-			socket.emit("C2S_Start", id);
+			socket.emit("c2s_Start", id);
 		}
 		Start(player_id);
 	}
 
 // === ゲームに関する処理 ===
-	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: Preload, create: Create, update: Update });
+	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 	
 	// 素材読み込み
-	function Preload () {
+	function preload () {
 		game.load.image('enemy', 'asset/enemy.png');
 		game.load.image('player', 'asset/player.png');
 		game.load.image('bullet', 'asset/bullet.png');
@@ -65,7 +65,7 @@ window.onload = function() {
 	var player, energy_bar, hp_bar;
 	var ANGLE = 200;
 	var BOOST_POWER = 5000;	
-	var USE_ENERGY = 2;
+	var USE_ENERGY = 1;
 
 	// ロケット
 	var Rocket = function ( game, x, y, image ){
@@ -94,12 +94,9 @@ window.onload = function() {
 		this.maxHealth = 100;
 		this.health = 80;
 		// エネルギー
-		this.energy = 100;
-		this.maxEnergy = 100;
-		// プレイヤーのループ処理
-		game.time.events.loop(Phaser.Timer.QUARTER, PlayerRecovery, this);
-		this.body.maxVelocity.setTo(this.MAX_SPEED, this.MAX_SPEED);
-		function PlayerRecovery(){
+		this.maxEnergy = 1000;
+		this.energy = 1000;
+		function playerRecovery() {
 			// Energyの回復
 			if(player.energy < player.maxEnergy){
 				player.energy++;
@@ -108,10 +105,21 @@ window.onload = function() {
 				player.health += 0.2;
 			}
 		}
+		// プレイヤーのループ処理
+		game.time.events.loop(Phaser.Timer.QUARTER, playerRecovery, this);
+		this.body.maxVelocity.setTo(this.MAX_SPEED, this.MAX_SPEED);
+
+		// 弾の発射
+		space_button = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR).onDown.add(fireBullet, this);
 	};
 	PlayerRocket.prototype = Object.create(Rocket.prototype);
 	PlayerRocket.prototype.constructor = PlayerRocket;
-	PlayerRocket.prototype.update = function(){
+
+	PlayerRocket.prototype.update = function() {
+		if (this.x > this.game.width) this.x = 0;
+		if (this.x < 0) this.x = this.game.width;
+		if (this.y > this.game.height) this.y = 0;
+		if (this.y < 0) this.y = this.game.height;
 		// 左右の回転
 		if (keys.left.isDown){
 			this.body.angularVelocity = -this.ROTATION_SPEED;
@@ -124,44 +132,44 @@ window.onload = function() {
 		if(keys.up.isDown){
 			if (this.energy - USE_ENERGY >= 0 ){
 				this.energy -= USE_ENERGY;
-				this.body.acceleration.x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
-				this.body.acceleration.y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+				this.body.acceleration.x =
+					Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+				this.body.acceleration.y =
+					Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 				console.log(this);
 				console.log(this.ACCELERATION);
 			}
 		}else{
 			this.body.acceleration.setTo(0, 0);
 		}
-	};
-
-	// プレイヤーメソッド
-	/*
-	  function(){
-		  if (this.ship.x > this.game.width) this.ship.x = 0;
-	 game.add.sprite	  if (this.ship.x < 0) this.ship.x = this.game.width;
-		  if (this.ship.y > this.game.height) this.ship.y = 0;
-		  if (this.ship.y < 0) this.ship.y = this.game.height;
 	}
-	*/
 
 	// 弾
-	Bullet = function ( game, x, y, rotate ){
+	var Bullet = function ( game, x, y, rotate ){
+		this.ROTATION_OFF_SET = -1.6;
+		this.ACCELERATION = 50;
 		// スプライト設定
-		bullet = game.add.sprite(x, y - 70, 'bullet');
+		Phaser.Sprite.call(this, game, x, y, 'bullet');
 		// 画像サイズ
-		bullet.scale.setTo(0.25, 0.25);
+		this.scale.setTo(0.3, 0.3);
 		// 中心
-		bullet.anchor.setTo(0.5, 0.5);
+		this.anchor.setTo(0.5, 0.5);
 		// あたり判定
-		bullet.body.setRectangle(10, 20);
+		this.game.physics.enable(this, Phaser.Physics.ARCADE);
 		// 向き
-		bullet.body.rotation = rotate;
+		this.rotation = rotate;
 		// 発射
-		bullet.body.thrust(15000);
+		game.add.existing(this);
+	}
+	Bullet.prototype = Object.create(Phaser.Sprite.prototype);
+	Bullet.prototype.constructor = Bullet;
+	Bullet.prototype.update = function() {
+		this.body.acceleration.x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+		this.body.acceleration.y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 	}
 
 	// 分岐して作成
-	function CreateObject( data ){
+	function createObject( data ){
 		var object = {};
 		switch (data.type){
 		case "user": 
@@ -175,7 +183,7 @@ window.onload = function() {
 		return object;
 	}
 	
-    function Create () {
+    function create () {
 		game.stage.disableVisibilityChange = true;
 		// 背景色
 		game.stage.backgroundColor = 0x333333;
@@ -210,28 +218,25 @@ window.onload = function() {
 		player.id = player_id;
 		player.type = "user";
 		console.log(player.id);
-
-		// スペースキー
-		space_button = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR).onDown.add(BulletFire, this);
 		
 		// テキスト
 		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
-		// SocketInit();
+		//socketInit();
 	}
 	
-	function BulletFire(){
+	function fireBullet(){
 		console.log("BulletFire");
-		CreateBullet(player.position.x, player.position.y, player.rotation);
+		bullet = new Bullet(game, player.position.x, player.position.y, player.rotation); 
 	}
 
-	function Update() {
+	function update() {
 		// ゲージの表示
 		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 
 		// 更新処理
 		//local_objects[player_id] = {type: player.type, position: player.position, rotation: player.rotation, health: player.health, owner_id: player_id};
-		//socket.emit("C2S_Update", local_objects);
+		//socket.emit("c2s_Update", local_objects);
 	}
 	
 	// イベントハンドラ（コールバック関数）
