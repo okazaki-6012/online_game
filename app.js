@@ -37,7 +37,7 @@ io.on('connection', function (socket) {
 				object_list[key].x = objects[key].position.x;
 				object_list[key].y = objects[key].position.y;
 				object_list[key].rotation = objects[key].rotation;
-				object_list[key].health = objects[key].health;
+				object_list[key].health = objects[key].health || 1;
 			}else{
 				console.log(key);
 				object_list[key].type = objects[key].type;
