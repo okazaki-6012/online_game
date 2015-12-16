@@ -76,8 +76,8 @@ window.onload = function() {
 		// 中心
 		this.anchor.setTo(0.5, 0.5);
 		// あたり判定
-		game.physics.enable(this, Phaser.Physics.ARCADE);
-		
+		this.game.physics.enable(this, Phaser.Physics.ARCADE);
+
 		game.add.existing(this);
 	};
 	Rocket.prototype = Object.create(Phaser.Sprite.prototype);
@@ -85,6 +85,11 @@ window.onload = function() {
 
 	var PlayerRocket = function (game, x, y){
 		Rocket.call(this, game, x, y, 'player');
+		// 加速
+		this.ACCELERATION = 200;
+		this.MAX_SPEED = 250;
+		this.ROTATION_SPEED = 180;
+		this.ROTATION_OFF_SET = -1.6;
 		// HPとか
 		this.maxHealth = 100;
 		this.health = 80;
@@ -93,6 +98,7 @@ window.onload = function() {
 		this.maxEnergy = 100;
 		// プレイヤーのループ処理
 		game.time.events.loop(Phaser.Timer.QUARTER, PlayerRecovery, this);
+		this.body.maxVelocity.setTo(this.MAX_SPEED, this.MAX_SPEED);
 		function PlayerRecovery(){
 			// Energyの回復
 			if(player.energy < player.maxEnergy){
@@ -108,15 +114,23 @@ window.onload = function() {
 	PlayerRocket.prototype.update = function(){
 		// 左右の回転
 		if (keys.left.isDown){
-			this.angle -= 3;
+			this.body.angularVelocity = -this.ROTATION_SPEED;
 		}else if (keys.right.isDown){
-			this.angle += 3;
+			this.body.angularVelocity = this.ROTATION_SPEED;
+		}else{
+			this.body.angularVelocity = 0;
 		}
 		// 進む
 		if(keys.up.isDown){
 			if (this.energy - USE_ENERGY >= 0 ){
 				this.energy -= USE_ENERGY;
+				this.body.acceleration.x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+				this.body.acceleration.y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+				console.log(this);
+				console.log(this.ACCELERATION);
 			}
+		}else{
+			this.body.acceleration.setTo(0, 0);
 		}
 	};
 
@@ -163,8 +177,10 @@ window.onload = function() {
 	
     function Create () {
 		game.stage.disableVisibilityChange = true;
+		// 背景色
+		game.stage.backgroundColor = 0x333333;
 		// 物理計算方式
-		game.physics.startSystem(Phaser.Physics.P2JS);
+		//game.physics.startSystem(Phaser.Physics.P2JS);
 		// キーボードのインプットを登録
 		keys = game.input.keyboard.createCursorKeys();
 		console.log(keys);
