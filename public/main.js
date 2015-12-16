@@ -182,6 +182,11 @@ window.onload = function() {
 		this.body.acceleration.y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 		if (this.x < 0 || this.x > this.game.width) this.destroy;
 		if (this.y < 0 || this.y > this.game.height) this.destroy();
+
+		if( game.physics.arcade.collide(this, player) ){
+			console.log(1);
+		}
+	
 	};
 
 	// 分岐して作成
