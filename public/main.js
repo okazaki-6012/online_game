@@ -1,215 +1,338 @@
 window.onload = function() {
-// === サーバに関する処理 ===
-	// 接続先の指定(192.168.8.89)
-	// var url = "http://192.168.8.89:8080";
-	var url = "http://" + window.location.hostname + ":8080";
-	// 接続
-	var socket = io.connect(url);
-	var player_id = "User" + Math.floor(Math.random()*10000);;
+	var networking;
+	var player_id;
 	var object_list;
+	var player, objects = {}, energy_bar, hp_bar;
+	var controller, hud;
+	var ANGLE = 200;
+	var BOOST_POWER = 5000;	
+	var USE_ENERGY = 20;
+
+	var puts = function(){ console.log.apply(console, arguments); };
 	
-	function SocketInit(){
-		// サーバからデータを受け取る
-		socket.on("S2C_Start", function (data){
-			object_list = data.object_list;
-			// 
-			for(key in objects){
-				if(object_list[key]) console.log(objects[key]);
+	function CreateClass(className, superClass, cls){
+		var constructor = function(){
+			cls.constructor.apply(this, arguments);
+		};
+		constructor.prototype = Object.create(superClass.prototype, {});
+		constructor.prototype.className = className;
+		constructor.prototype.super = superClass.prototype;
+		for( var key in cls ){
+			if( cls.hasOwnProperty(key) ){
+				constructor.prototype[key] = cls[key];
 			}
-		});
-
-		// サーバからデータを受け取り更新
-		socket.on("S2C_Update", function (data) {
-			object_list = data.object_list;
-		});
-
-		function Start(id) {
-			socket.emit("C2S_Start", id);
 		}
-		Start(player_id);
+		return constructor;
 	}
-
-// === ゲームに関する処理 ===
-	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: Preload, create: Create, update: Update });
 	
-// 素材読み込み
-	function Preload () {
+	// === ゲームに関する処理 ===
+	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preloadGame, create: createGame, update: updateGame });
+	
+	// 素材読み込み
+	function preloadGame () {
 		game.load.image('enemy', 'asset/enemy.png');
 		game.load.image('player', 'asset/player.png');
 		game.load.image('bullet', 'asset/bullet.png');
 	}
 
-	var player, objects = {}, energy_bar, hp_bar;
-	var ANGLE = 200;
-	var BOOST_POWER = 5000;	
-	var USE_ENERGY = 20;
-
-	function CreateRocket ( x, y, image_name ){
-		var rocket = {};
-		// スプライト設定
-		rocket = game.add.sprite(x, y, image_name);
-		// 物理演算
-		game.physics.p2.enable(rocket);
-		// 画像サイズ
-		rocket.scale.setTo(0.3, 0.3);
-		// 中心
-		rocket.anchor.setTo(0.5, 0.5);
-		// あたり判定
-		rocket.body.setRectangle(20, 80);
-		return rocket;
-	}
-
-	function CreateBullet ( x, y, rotate ){
-		var bullet = {};
-		// スプライト設定
-		bullet = game.add.sprite(x, y - 70, 'bullet');
-		// 物理演算
-		game.physics.p2.enable(bullet);
-		// 画像サイズ
-		bullet.scale.setTo(0.25, 0.25);
-		// 中心
-		bullet.anchor.setTo(0.5, 0.5);
-		// あたり判定
-		bullet.body.setRectangle(10, 20);
-		// 向き
-		bullet.body.rotation = rotate;
-		// 発射
-		bullet.body.thrust(15000);
-		return bullet;
-	}
-	
-    function Create () {
+	// Gameの初期化
+    function createGame () {
+		game.time.desiredFps = 15; // 15FPSに指定
 		game.stage.disableVisibilityChange = true;
-		// 物理計算方式
-		game.physics.startSystem(Phaser.Physics.P2JS);
+		// game.physics.startSystem(Phaser.Physics.P2JS);
 		
-		// キーボードのインプットを登録
-		keys = game.input.keyboard.createCursorKeys();
-		// playerの設定
-		player = CreateRocket( Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), 'player' );
-		// プレイヤーの移動処理
-		keys.up.onDown.add(PlayerMove, this);
-		// プレイヤーの回復処理
-		game.time.events.loop(Phaser.Timer.QUARTER, PlayerRecovery, this);
-		// あたり判定 ( 円 )
-		// player.body.setCircle(25);
-		
-		// 最大HP
-		console.log(player.maxHealth);
-		// HPの回復
-		player.heal(50);
-		// 現在のHP
-		console.log(player.health);
-		
-		// HPゲージ
-		var hp_bar_bg = game.add.graphics(50, 30);
-		hp_bar_bg.lineStyle(16, 0xff0000, 0.8);
-		hp_bar_bg.lineTo(player.maxHealth, 0);
-		hp_bar = game.add.graphics(50, 30);
-
-		// power 最大値
-		player.maxEnergy = 100;
-		// power 初期値
-		player.energy = 100;
-		
-		// powerゲージ
-		var energy_bar_bg = game.add.graphics(80, 52.5);
-		energy_bar_bg.lineStyle(16, 0xff0000, 0.8);
-		energy_bar_bg.lineTo(player.maxEnergy, 0);
-		energy_bar = game.add.graphics(80, 52.5);
-		
-		// ユーザID
-		player.id = player_id;
-		player.type = "user";
-		console.log(player.id);
-		console.log(Object.keys(player));
-
-		// スペースキー
-		space_button = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR).onDown.add(BulletFire, this);
-		console.log(space_button);
-		
-		// テキスト
-		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
-		SocketInit();
+		// ネットワークの初期化
+		var url = "http://" + window.location.hostname + ":8080";
+		var playerId = Math.floor(Math.random()*10000);
+		networking = new Networking(game, url, playerId);
+		networking.onInitialize = function(){
+			// playerの設定
+			player = new Rocket(game, {x: Math.floor(Math.random()*800+20), y: Math.floor(Math.random()*600+20), rotation: 0});
+			controller = new PlayerController(game, player);
+			hud = new PlayerHud(game, player);
+		};
 	}
 
-	// ほかのユーザなどを作成
-	function CreateObject( data ){
-		var id = data.owner_id;
-		switch (data.type){
-		case "user": 
-			// スプライトを生成
-			objects[id] = CreateRocket(data.x, data.y, 'enemy');
-			objects[id].id = id;
-			console.log(objects[id]);
-			break;
-		default:
-			break;
-		}
+	// Gameの更新処理
+	function updateGame() {
 	}
 
-	// プレイヤーメソッド
-	function PlayerMove(){
-		if (player.energy - USE_ENERGY >= 0 ){
-			player.energy -= USE_ENERGY;
-			player.body.thrust(BOOST_POWER);
-		}
-	}
+	/*******************************************************
+	 * 通信処理を行うオブジェクト
+	 *******************************************************/
+	var Networking = CreateClass('Networking', Phaser.Sprite, {
+		constructor: function(game, url, playerId){
+			var _this = this;
+			Phaser.Sprite.call(this, game, 0, 0, null);
 
-	function PlayerRecovery(){
-	    // Energyの回復
-		if(player.energy < player.maxEnergy){
-			player.energy++;
-		}
-		if(player.health < player.maxHealth){
-			player.health += 0.2;
-		}
-    }
+			this.playerId = playerId;
+			this.socket = io.connect(url);
+			this.objects = {};
+			
+			// サーバからデータを受け取る
+			this.socket.on("S2C_Start", function (data){
+				for( var i = 0; i< data.objectList.length; i++){
+					_this.updateObject(data.objectList[i]);
+				}
+				_this.socket.emit("C2S_Start", playerId);
+				_this.onInitialize();
+			});
 
-	function BulletFire(){
-		console.log("BulletFire");
-		CreateBullet(player.position.x, player.position.y, player.rotation);
-	}
+			// サーバからデータを受け取り更新
+			this.socket.on("S2C_Update", function (data) {
+				_this.updateObject(data);
+			});
+
+			// サーバからデータを受け取り更新
+			this.socket.on("S2C_Delete", function (id) {
+				_this.deleteObject(id);
+			});
+
+			this.socket.on("disconnect", function (data){
+				console.log('disconnected');
+			});
+		},
+		update: function(){
+		},
+		updateObject: function(data){
+			if( this.objects[data.id] ){
+				this.objects[data.id].receiveData(data);
+			}else{
+				this.objects[data.id] = this.createObject(data);
+			}
+		},
+		createObject: function(data){
+			// console.log('create object: '+data.id);
+			var cls = networkingClasses[data.className];
+			var newObject = new cls(game, data);
+			return newObject;
+		},
+		deleteObject: function(id){
+			// console.log('delete object: '+id);
+			if( this.objects[id] ){
+				this.objects[id].onDelete();
+				delete this.objects[id];
+			}
+		},
+		onInitialize: function(){}
+	});
 	
-	function Update() {
-		
-		player.body.angularVelocity = 0;
-		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
-		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 
-		if (keys.left.isDown){
-			player.body.rotateLeft(100);
-		}else if (keys.right.isDown){
-			player.body.rotateRight(100);
-		}
-		player.body.angularAcceleration = 0;
-
-		// 更新処理
-		var local_objects = {};
-		local_objects[player_id] = {type: player.type, position: player.position, rotation: player.rotation, health: player.health, owner_id: player_id};
-		socket.emit("C2S_Update", local_objects);
-		for(key in object_list){
-			// 無かったら作成、あったら更新
-			if(key != player_id){
-				// 既存にあるものは弾く
-				if(jQuery.isEmptyObject(objects[key])){
-					CreateObject(object_list[key]);
-				}else{
-					objects[key].body.x = object_list[key].x;
-					objects[key].body.y = object_list[key].y;
-					objects[key].body.rotation = object_list[key].rotation;
+	/*******************************************************
+	 * ネットワークで同期されるオブジェクト
+	 *******************************************************/
+	var SyncObject = CreateClass('SyncObject', Phaser.Sprite, {
+		constructor: function(game, data){
+			Phaser.Sprite.call(this, game, 0, 0, null);
+			if( data.id ){
+				this.id = ''+data.id;
+			}else{
+				this.id = ''+Math.floor(Math.random()*1000000);
+				this.ownerId = networking.playerId;
+			}
+			this.initializeData(data);
+			game.add.existing(this);
+		},
+		initializeData: function(data){
+			this.receiveData(data);
+		},
+		emit: function(data){
+			data.className = this.className;
+			data.id = this.id;
+			networking.socket.emit('C2S_Update', data);
+		},
+		sendData: function(data){
+		},
+		receiveData: function(data){
+			for( var key in data ){
+				if( data.hasOwnProperty(key) ){
+					this[key] = data[key];
 				}
 			}
+		},
+		onDelete: function(data){
+			this.destroy();
+		},
+		onReceiveData: function(data){
+			// DO NOTHING
+		},
+		isOwn: function(){
+			return (this.ownerId == networking.playerId);
 		}
-		// サーバに存在しないものを削除
-		for(key in objects){
-			if(!(object_list[key])) objects[key].kill();
+	});
+
+	/*******************************************************
+	 * プレイヤー/敵のロケット.
+	 *******************************************************/
+	var Rocket = CreateClass('Rocket', SyncObject, {
+		constructor: function(game, data){
+			SyncObject.call(this, game, data);
+
+			this.energy = 100;
+			this.maxEnergy = 100;
+			this.health = 100;
+			this.maxHealth = 100;
+			this.vx = 0;
+			this.vy = 0;
+			this.reloadTime = 0;
+
+			this.setTexture(game.cache.getPixiTexture('player'));
+			this.scale.setTo(0.3, 0.3);
+			this.anchor.setTo(0.5, 0.5);
+			// this.body.setRectangle(20, 80);
+		
+			// タイマー処理の登録
+			this.recovertyTimer = game.time.events.loop(0.2 * Phaser.Timer.SECOND, this.onRecovery, this);
+			this.networkTimer = game.time.events.loop(0.2 * Phaser.Timer.SECOND, this.onNetwork, this);
+		},
+		update: function(){
+			this.x += this.vx * game.time.physicsElapsed;
+			this.y += this.vy * game.time.physicsElapsed;
+		},
+		onRecovery: function(){
+			// Energyの回復
+			if(this.energy < this.maxEnergy){
+				this.energy++;
+			}
+			if(this.health < player.maxHealth){
+				player.health += 0.2;
+			}
+		},
+		onNetwork: function(){
+			if( this.isOwn() ){
+				this.emit({x: this.x, y: this.y, vx: this.vx, vy: this.vy, rotation: this.rotation, energy: this.energy, health: this.health});
+			}
+		},
+		receiveData: function(data){
+			SyncObject.prototype.receiveData.call(this, data);
+		},
+		makeBullet: function(){
+			var x = this.x + Math.sin(this.rotation) * 40;
+			var y = this.y - Math.cos(this.rotation) * 40;
+			var bullet = new Bullet(game, {x: x, y: y, rotation: this.rotation});
+			bullet.sendData();
+			return bullet;
 		}
-	}
-	
-	// イベントハンドラ（コールバック関数）
-	function collisionHandler (obj1, obj2) {
-		console.log("hey");
-	}
+
+	});
+
+	/*******************************************************
+	 * 弾
+	 *******************************************************/ 
+	var Bullet = CreateClass('Bullet', SyncObject, {
+		constructor: function(game, data){
+			SyncObject.call(this, game, data);
+
+			// 画像の指定
+			this.setTexture(game.cache.getPixiTexture('bullet'));
+			this.scale.setTo(0.25, 0.25);
+			this.anchor.setTo(0.5, 0.5);
+			
+			// 物理演算
+			//game.physics.p2.enable(bullet);
+			// あたり判定
+			//bullet.body.setRectangle(10, 20);
+			// 向き
+			//bullet.body.rotation = rotate;
+			// 発射
+			//bullet.body.thrust(15000);
+		},
+		update: function(){
+			// this.rotation = rotation;
+			this.speed = 200;
+			this.vx = Math.sin(this.rotation) * this.speed;
+			this.vy = -Math.cos(this.rotation) * this.speed;
+			
+			this.x += this.vx * game.time.physicsElapsed;
+			this.y += this.vy * game.time.physicsElapsed;
+		},
+		sendData: function(){
+			this.emit({x: this.x, y: this.y, rotation: this.rotation});
+		}
+	});
+
+	/*******************************************************
+	 * プレイヤーの入力を処理するクラス.
+	 *******************************************************/
+	var PlayerController = CreateClass('PlayerController', Phaser.Sprite, {
+		constructor: function(game, player){
+			Phaser.Sprite.call(this, game, 0, 0, null);
+			this.player = player;
+			this.keys = game.input.keyboard.addKeys({
+				'a': Phaser.KeyCode.Z,
+				'b': Phaser.KeyCode.X,
+				'up': Phaser.KeyCode.UP,
+				'down': Phaser.KeyCode.DOWN,
+				'left': Phaser.KeyCode.LEFT,
+				'right': Phaser.KeyCode.RIGHT
+			});
+
+			game.add.existing(this);
+		},
+		update: function(){
+			var p = this.player;
+			if (this.keys.left.isDown){
+				p.rotation -= 3 * game.time.physicsElapsed;
+			}else if (this.keys.right.isDown){
+				p.rotation += 3 * game.time.physicsElapsed;
+			}
+			if (this.keys.up.isDown){
+				if( p.energy >= 1 ){
+					p.vx += 100 * Math.sin(p.rotation) * game.time.physicsElapsed;
+					p.vy -= 100 * Math.cos(p.rotation) * game.time.physicsElapsed;
+					p.energy -= 10.0 * game.time.physicsElapsed;
+				}
+			}
+			if (this.keys.a.isDown){
+				if( p.reloadTime <= 0 && p.energy >= 1 ){
+					p.makeBullet();
+					p.reloadTime = 0.06;
+					p.energy -= 1; 
+				}
+			}
+			this.player.reloadTime -= game.time.physicsElapsed;
+		}
+	});
+
+	/*******************************************************
+	 * 画面上部のHPやエナジーの表示.
+	 *******************************************************/
+	var PlayerHud = CreateClass('PlayerHud', Phaser.Sprite, {
+		constructor: function(game, player){
+			Phaser.Sprite.call(this, game, 0, 0, null);
+			
+			this.player = player;
+			
+			// HPゲージ
+			this.hpBarBg = game.add.graphics(50, 30)
+					.lineStyle(16, 0xff0000, 0.8)
+					.lineTo(player.maxHealth, 0);
+			
+			this.hpBar = game.add.graphics(50, 30);
+
+			// powerゲージ
+			this.energyBarBg = game.add.graphics(80, 52.5)
+					.lineStyle(16, 0xff0000, 0.8)
+					.lineTo(player.maxEnergy, 0);
+			
+			this.energyBar = game.add.graphics(80, 52.5);
+			
+			// テキスト
+			this.text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
+
+
+			game.add.existing(this);
+		},
+		update: function(){
+			this.energyBar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(this.player.energy, 0);
+			this.hpBar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(this.player.health, 0);
+		}
+	});
+
+	var networkingClasses = {
+		Rocket: Rocket,
+		Bullet: Bullet
+	};
+
 };
 
