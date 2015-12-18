@@ -42,7 +42,7 @@ window.onload = function() {
 			// サーバに無いローカル上のものを削除
 			if(Object.keys(server_objects).length != 0){
 				for(key in local_objects){
-					if(!(server_objects[key])) local_objects[key].destroy;
+					if(key != player_id && !(server_objects[key])) local_objects[key].destroy();
 				}
 			}
 		});
@@ -64,9 +64,6 @@ window.onload = function() {
 	}
 
 	var player, energy_bar, hp_bar;
-	var ANGLE = 200;
-	var BOOST_POWER = 5000;	
-	var USE_ENERGY = 1;
 
 	// ロケット
 	var Rocket = function ( game, x, y, image, id, type ){
@@ -91,14 +88,17 @@ window.onload = function() {
 	var PlayerRocket = function (game, x, y, image, id, type){
 		Rocket.call(this, game, x, y, image, id, type);
 		// 定数
-		this.ACCELERATION = 10;
+		this.ACCELERATION = 8;
 		this.MAX_SPEED_X = 250;
 		this.MAX_SPEED_Y = 250;
 		this.ROTATION_SPEED = 180;
 		this.ROTATION_OFF_SET = -1.57;
+		this.USE_ENERGY = 1;
 		// 速度
 		this.speed_x = 0;
 		this.speed_y = 0;
+		// 摩擦
+		this.friction = 1;
 		// HPとか
 		this.maxHealth = 100;
 		this.health = 80;
@@ -115,26 +115,19 @@ window.onload = function() {
 			if(this.health < this.maxHealth){
 				this.health += 0.2;
 			}
-			if(this.speed_x > 0){
-				this.speed_x -= 1;
-			}else if(this.speed_x < 0){
-				this.speed_x += 1;
-			}
-			if(this.speed_y > 0){
-				this.speed_y -= 1;
-			}else if(this.speed_y < 0){
-				this.speed_y += 1;
-			}
 		}
 		// ループ処理( 250ミリ秒毎 )
 		game.time.events.loop(Phaser.Timer.QUARTER, playerRecovery, this);
 
 		// 弾の発射
 		function fireBullet(){
-			var x = this.position.x + Math.sin(this.rotation) * 60;
-			var y = this.position.y - Math.cos(this.rotation) * 60;
-			var bullet = new Bullet(game, x, y, this.rotation);
-			local_objects[bullet.id] = {type: bullet.type, position: bullet.position, rotation: bullet.rotation, owner_id: this.id};
+			if (this.energy - (this.USE_ENERGY*10) >= 0 ){
+				this.energy -= (this.USE_ENERGY*10);
+				var x = this.x + Math.sin(this.rotation) * 60;
+				var y = this.y - Math.cos(this.rotation) * 60;
+				var bullet = new Bullet(game, x, y, this.rotation);
+				local_objects[bullet.id] = {type: bullet.type, position: bullet.position, rotation: bullet.rotation, owner_id: this.id};
+			}
 		}
 		// 弾を撃つキーの設定
 		keys.space.onDown.add(fireBullet, this);
@@ -157,26 +150,31 @@ window.onload = function() {
 
 		// 加速
 		if(keys.up.isDown){
-			if (this.energy - USE_ENERGY >= 0 ){
-				this.energy -= USE_ENERGY;
-				if(this.speed_x <= this.MAX_SPEED_X)
-				this.speed_x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
-				if(this.speed_y <= this.MAX_SPEED_Y)
-				this.speed_y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+			if (this.energy - this.USE_ENERGY >= 0 ){
+				this.energy -= this.USE_ENERGY;
+				if(this.speed_x <= this.MAX_SPEED_X){
+					this.speed_x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+				}
+				if(this.speed_y <= this.MAX_SPEED_Y){
+					this.speed_y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+				}
 			}
-		}else{
-			this.body.acceleration.setTo(0, 0);
+			this.friction = 1;
+		}else if(this.friction > 0){
+			this.friction -= 0.03;
 		}
 
 		// 移動
-		this.x += this.speed_x;
-		this.y += this.speed_y;
+		if(this.friction >= 0){
+			this.x += this.speed_x * this.friction;
+			this.y += this.speed_y * this.friction;
+		}
 	}
 
 	// 弾
 	var Bullet = function ( game, x, y, rotate ){
 		this.ROTATION_OFF_SET = -1.57;
-		this.ACCELERATION = 50;
+		this.ACCELERATION = 5;
 		// スプライト設定
 		Phaser.Sprite.call(this, game, x, y, 'bullet');
 		// 画像サイズ
@@ -186,7 +184,7 @@ window.onload = function() {
 		this.type = "bullet";
 		// 中心
 		this.anchor.setTo(0.5, 0.5);
-		// あたり判定
+		// 物理演算
 		this.game.physics.enable(this, Phaser.Physics.ARCADE);
 		// 向き
 		this.rotation = rotate;
@@ -196,8 +194,8 @@ window.onload = function() {
 	Bullet.prototype = Object.create(Phaser.Sprite.prototype);
 	Bullet.prototype.constructor = Bullet;
 	Bullet.prototype.update = function() {
-		this.x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
-		this.y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+		this.x += Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+		this.y += Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 		if (this.x < 0 || this.x > this.game.width){
 			this.destroy();
 		}else if (this.y < 0 || this.y > this.game.height){
