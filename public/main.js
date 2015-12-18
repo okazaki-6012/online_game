@@ -28,21 +28,29 @@ window.onload = function() {
 															 server_objects[key].owner_id,
 															 "user" );
 							break;
+						case "bullet":
+							local_objects[key] = new Bullet( game,
+															 server_objects[key].x,
+															 server_objects[key].y,
+															 server_objects[key].rotation,
+															 server_objects[key].owner_id );
+							break;
 						default:
 							break;
 						}
 					}else{
 						// 存在する場合、更新
-						local_objects[key].position.x = server_objects[key].x;
-						local_objects[key].position.y = server_objects[key].y;
+						local_objects[key].x = server_objects[key].x;
+						local_objects[key].y = server_objects[key].y;
 						local_objects[key].rotation = server_objects[key].rotation;
 					}
 				}
 			}
+			console.log(server_objects);
 			// サーバに無いローカル上のものを削除
 			if(Object.keys(server_objects).length != 0){
 				for(key in local_objects){
-					if(key != player_id && !(server_objects[key])) local_objects[key].destroy();
+					if(local_objects[key].owner_id != player_id && !(server_objects[key])) local_objects[key].destroy();
 				}
 			}
 		});
@@ -125,8 +133,9 @@ window.onload = function() {
 				this.energy -= (this.USE_ENERGY*10);
 				var x = this.x + Math.sin(this.rotation) * 60;
 				var y = this.y - Math.cos(this.rotation) * 60;
-				var bullet = new Bullet(game, x, y, this.rotation);
-				local_objects[bullet.id] = {type: bullet.type, position: bullet.position, rotation: bullet.rotation, owner_id: this.id};
+				var bullet = new Bullet(game, x, y, this.rotation, this.owner_id);
+				local_objects[bullet.id] = {type: bullet.type, x: bullet.x, y: bullet.y, rotation: bullet.rotation, owner_id: this.owner_id};
+				console.log(local_objects);
 			}
 		}
 		// 弾を撃つキーの設定
@@ -172,7 +181,7 @@ window.onload = function() {
 	}
 
 	// 弾
-	var Bullet = function ( game, x, y, rotate ){
+	var Bullet = function ( game, x, y, rotate, id ){
 		this.ROTATION_OFF_SET = -1.57;
 		this.ACCELERATION = 5;
 		// スプライト設定
@@ -197,8 +206,10 @@ window.onload = function() {
 		this.x += Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 		this.y += Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 		if (this.x < 0 || this.x > this.game.width){
+			delete local_objects[this.id];
 			this.destroy();
 		}else if (this.y < 0 || this.y > this.game.height){
+			delete local_objects[this.id];
 			this.destroy();
 		}
 
@@ -250,13 +261,14 @@ window.onload = function() {
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 
 		// 更新処理
-		local_objects[player_id] = {type: player.type, position: player.position, rotation: player.rotation, health: player.health, owner_id: player_id};
+		local_objects[player_id] = {type: player.type, x: player.x, y: player.y, rotation: player.rotation, health: player.health, owner_id: player_id};
 		var update_objects = {};
 		for(key in local_objects){
 			if(local_objects[key].owner_id == player_id){
 				update_objects[key] = local_objects[key];
 			}
 		}
+
 		socket.emit("c2s_Update", update_objects);
 	}
 	

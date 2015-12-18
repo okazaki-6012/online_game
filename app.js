@@ -33,13 +33,12 @@ io.on('connection', function (socket) {
 	socket.on("c2s_Update", function ( objects ) {
 		var id = user_list[socket.id];
 		for(key in objects){
-			if(Object.keys(object_list[key]).length == 0){
+			if(!object_list[key]){
 				console.log(key);
-				object_list[key].type = objects[key].type;
-				object_list[key].owner_id = id;
+				object_list[key] = {type: objects[key].type, owner_id: id};
 			}else{
-				object_list[key].x = objects[key].position.x;
-				object_list[key].y = objects[key].position.y;
+				object_list[key].x = objects[key].x;
+				object_list[key].y = objects[key].y;
 				object_list[key].rotation = objects[key].rotation;
 				object_list[key].health = objects[key].health || 1;
 			}
