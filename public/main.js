@@ -6,48 +6,49 @@ window.onload = function() {
 	// 接続
 	var socket = io.connect(url);
 	var player_id = "User" + Math.floor(Math.random()*10000);
-	var object_list, local_objects = {};
-	
-	function socketInit(){
-		// サーバからデータを受け取る
-		socket.on("s2c_Start", function (data){
-			object_list = data.object_list;
-			for(key in object_list){
-				// 情報を受けて生成
-				local_objects[key] = createObject(object_list[key]);
-			}
-			console.log(local_objects);
-		});
+	var local_objects = {};
 
+	function socketInit(){
 		// サーバからデータを受け取り更新
 		socket.on("s2c_Update", function (data) {
-			object_list = data.object_list;
-			// サーバのデータを元に更新と生成
-			for(key in object_list){
+			var server_objects = data.object_list || {};
+			// サーバ内のオブジェクトを確認
+			for(key in server_objects){
 				if(key != player_id){
-					// 既存にあるものは弾く
-					if(jQuery.isEmptyObject(local_objects[key])){
-						createObject(object_list[key]);
+					// ローカルに存在するか、確認
+					if(!local_objects[key]){
+						// 存在しない場合、生成
+						switch (server_objects[key].type){
+						case "user": 
+				  			// スプライトを生成
+							local_objects[key] = new Rocket( game,
+															 server_objects[key].x,
+															 server_objects[key].y,
+															 "enemy",
+															 server_objects[key].owner_id,
+															 "user" );
+							break;
+						default:
+							break;
+						}
 					}else{
-						local_objects[key].body.x = object_list[key].x;
-						local_objects[key].body.y = object_list[key].y;
-						local_objects[key].body.rotation = object_list[key].rotation;
+						// 存在する場合、更新
+						local_objects[key].position.x = server_objects[key].x;
+						local_objects[key].position.y = server_objects[key].y;
+						local_objects[key].rotation = server_objects[key].rotation;
 					}
 				}
 			}
-			// サーバに存在しないものを削除
-			console.log("ローカル：");
-			console.log(local_objects);
-			console.log("サーバ：");
-			console.log(object_list);
-			// ローカルとサーバを比較しサーバに無いものをローカルから削除
-			for(key in local_objects){
-				//if(!(object_list[key])) local_objects[key].kill();
+			// サーバに無いローカル上のものを削除
+			if(Object.keys(server_objects).length != 0){
+				for(key in local_objects){
+					if(!(server_objects[key])) local_objects[key].destroy;
+				}
 			}
 		});
 
 		function Start(id) {
-			socket.emit("c2s_Start", id);
+			socket.emit("c2s_Start", id);	
 		}
 		Start(player_id);
 	}
@@ -68,48 +69,61 @@ window.onload = function() {
 	var USE_ENERGY = 1;
 
 	// ロケット
-	var Rocket = function ( game, x, y, image ){
+	var Rocket = function ( game, x, y, image, id, type ){
 		// スプライト設定
 		Phaser.Sprite.call(this, game, x, y, image);
 		// 画像サイズ
 		this.scale.setTo(0.3, 0.3);
 		// 中心
 		this.anchor.setTo(0.5, 0.5);
-		// あたり判定
+		// 物理演算
 		this.game.physics.enable(this, Phaser.Physics.ARCADE);
+				// ユーザID
+		this.owner_id = id;
+		this.type = type;
+
 		game.add.existing(this);
 	};
 	Rocket.prototype = Object.create(Phaser.Sprite.prototype);
 	Rocket.prototype.constructor = Rocket;
 
-	var PlayerRocket = function (game, x, y, id){
-		console.log(this);
-		Rocket.call(this, game, x, y, 'player');
+	// プレイヤー用のロケット
+	var PlayerRocket = function (game, x, y, image, id, type){
+		Rocket.call(this, game, x, y, image, id, type);
 		// 定数
-		this.ACCELERATION = 200;
-		this.MAX_SPEED = 250;
+		this.ACCELERATION = 10;
+		this.MAX_SPEED_X = 250;
+		this.MAX_SPEED_Y = 250;
 		this.ROTATION_SPEED = 180;
 		this.ROTATION_OFF_SET = -1.57;
+		// 速度
+		this.speed_x = 0;
+		this.speed_y = 0;
 		// HPとか
 		this.maxHealth = 100;
 		this.health = 80;
-		// ユーザID
-		this.id = id;
-		this.type = "user";
 		// エネルギー
 		this.maxEnergy = 200;
 		this.energy = 200;
-		// 速度制限
-		this.body.maxVelocity.setTo(this.MAX_SPEED, this.MAX_SPEED);
 		
 		function playerRecovery() {
 			// Energyの回復
-			if(player.energy < player.maxEnergy){
-				player.energy++;
+			if(this.energy < this.maxEnergy){
+				this.energy++;
 			}
 			// Healthの回復
-			if(player.health < player.maxHealth){
-				player.health += 0.2;
+			if(this.health < this.maxHealth){
+				this.health += 0.2;
+			}
+			if(this.speed_x > 0){
+				this.speed_x -= 1;
+			}else if(this.speed_x < 0){
+				this.speed_x += 1;
+			}
+			if(this.speed_y > 0){
+				this.speed_y -= 1;
+			}else if(this.speed_y < 0){
+				this.speed_y += 1;
 			}
 		}
 		// ループ処理( 250ミリ秒毎 )
@@ -141,18 +155,22 @@ window.onload = function() {
 			this.body.angularVelocity = 0;
 		}
 
-		// 進む
+		// 加速
 		if(keys.up.isDown){
 			if (this.energy - USE_ENERGY >= 0 ){
 				this.energy -= USE_ENERGY;
-				this.body.acceleration.x =
-					Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
-				this.body.acceleration.y =
-					Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+				if(this.speed_x <= this.MAX_SPEED_X)
+				this.speed_x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+				if(this.speed_y <= this.MAX_SPEED_Y)
+				this.speed_y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 			}
 		}else{
 			this.body.acceleration.setTo(0, 0);
 		}
+
+		// 移動
+		this.x += this.speed_x;
+		this.y += this.speed_y;
 	}
 
 	// 弾
@@ -178,45 +196,37 @@ window.onload = function() {
 	Bullet.prototype = Object.create(Phaser.Sprite.prototype);
 	Bullet.prototype.constructor = Bullet;
 	Bullet.prototype.update = function() {
-		this.body.acceleration.x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
-		this.body.acceleration.y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
-		if (this.x < 0 || this.x > this.game.width) this.destroy;
-		if (this.y < 0 || this.y > this.game.height) this.destroy();
+		this.x = Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+		this.y = Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+		if (this.x < 0 || this.x > this.game.width){
+			this.destroy();
+		}else if (this.y < 0 || this.y > this.game.height){
+			this.destroy();
+		}
 
 		if( game.physics.arcade.collide(this, player) ){
 			console.log(1);
 		}
+	};
 	
+	function setupKeys (game){
+		// UP, DOWN, LEFT, RIGHT
+		this.keys = game.input.keyboard.createCursorKeys();
+		// SPACE
+		this.keys["space"] = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+		return this.keys;
 	};
 
-	// 分岐して作成
-	function createObject( data ){
-		var object = {};
-		switch (data.type){
-		case "user": 
-			// スプライトを生成
-			object = new EnemyRocket(game, data.x, data.y);
-			object.owner_id = data.owner_id;;
-			break;
-		default:
-			break;
-		}
-		return object;
-	}
-	
     function create () {
 		game.stage.disableVisibilityChange = true;
 		// 背景色
 		game.stage.backgroundColor = 0x333333;
-		// 物理計算方式
-		//game.physics.startSystem(Phaser.Physics.P2JS);
 		// キーボードのインプットを登録
-		keys = game.input.keyboard.createCursorKeys();
-		keys["space"] = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+		keys = setupKeys(game);
 		console.log(keys);
 		// playerの設定
 		// スプライト設定
-		player = new PlayerRocket(game, Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), player_id);
+		player = new PlayerRocket(game, Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), "player", player_id, "user");
 		// game.add.sprite( Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), 'player' );
 		
 		// HPゲージ
@@ -243,7 +253,13 @@ window.onload = function() {
 
 		// 更新処理
 		local_objects[player_id] = {type: player.type, position: player.position, rotation: player.rotation, health: player.health, owner_id: player_id};
-		socket.emit("c2s_Update", local_objects);
+		var update_objects = {};
+		for(key in local_objects){
+			if(local_objects[key].owner_id == player_id){
+				update_objects[key] = local_objects[key];
+			}
+		}
+		socket.emit("c2s_Update", update_objects);
 	}
 	
 	// イベントハンドラ（コールバック関数）

@@ -15,7 +15,7 @@ io.on('connection', function (socket) {
 	var user_num = Object.keys(user_list).length+1;
 	console.log("接続数：" + user_num);
 	// サーバに保持しているデータを返す
-	io.emit("s2c_Start", {object_list: object_list});
+	io.emit("s2c_Update", {object_list: object_list});
 
 	// クライアントからの接続受信
 	socket.on("c2s_Start", function ( id ) {
@@ -33,15 +33,15 @@ io.on('connection', function (socket) {
 	socket.on("c2s_Update", function ( objects ) {
 		var id = user_list[socket.id];
 		for(key in objects){
-			if(object_list[key]){
+			if(Object.keys(object_list[key]).length == 0){
+				console.log(key);
+				object_list[key].type = objects[key].type;
+				object_list[key].owner_id = id;
+			}else{
 				object_list[key].x = objects[key].position.x;
 				object_list[key].y = objects[key].position.y;
 				object_list[key].rotation = objects[key].rotation;
 				object_list[key].health = objects[key].health || 1;
-			}else{
-				console.log(key);
-				object_list[key].type = objects[key].type;
-				object_list[key].owner_id = id;
 			}
 		}
 		socket.broadcast.emit("s2c_Update", {object_list: object_list});
