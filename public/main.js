@@ -14,7 +14,7 @@ window.onload = function() {
 			var server_objects = data.object_list || {};
 			// サーバ内のオブジェクトを確認
 			for(key in server_objects){
-				if(key != player_id){
+				if(server_objects[key].owner_id != player_id){
 					// ローカルに存在するか、確認
 					if(!local_objects[key]){
 						// 存在しない場合、生成
@@ -34,23 +34,29 @@ window.onload = function() {
 															 server_objects[key].y,
 															 server_objects[key].rotation,
 															 server_objects[key].owner_id );
+							console.log(server_objects[key]);
 							break;
 						default:
 							break;
 						}
 					}else{
 						// 存在する場合、更新
-						local_objects[key].x = server_objects[key].x;
-						local_objects[key].y = server_objects[key].y;
-						local_objects[key].rotation = server_objects[key].rotation;
+						if(server_objects[key].type == "user"){
+							local_objects[key].x = server_objects[key].x;
+							local_objects[key].y = server_objects[key].y;
+							local_objects[key].rotation = server_objects[key].rotation;
+						}
 					}
 				}
 			}
-			console.log(server_objects);
+			
 			// サーバに無いローカル上のものを削除
 			if(Object.keys(server_objects).length != 0){
 				for(key in local_objects){
-					if(local_objects[key].owner_id != player_id && !(server_objects[key])) local_objects[key].destroy();
+					if(local_objects[key].owner_id != player_id && !(server_objects[key])){
+						local_objects[key].destroy();
+						delete local_objects[key];
+					}
 				}
 			}
 		});
@@ -245,10 +251,10 @@ window.onload = function() {
 		hp_bar = game.add.graphics(50, 30);
 
 		// powerゲージ
-		var energy_bar_bg = game.add.graphics(80, 52.5);
+		var energy_bar_bg = game.add.graphics(80, 53);
 		energy_bar_bg.lineStyle(16, 0xff0000, 0.8);
 		energy_bar_bg.lineTo(player.maxEnergy, 0);
-		energy_bar = game.add.graphics(80, 52.5);
+		energy_bar = game.add.graphics(80, 53);
 		
 		// テキスト
 		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });

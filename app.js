@@ -35,12 +35,24 @@ io.on('connection', function (socket) {
 		for(key in objects){
 			if(!object_list[key]){
 				console.log(key);
-				object_list[key] = {type: objects[key].type, owner_id: id};
+				object_list[key] = { type: objects[key].type, owner_id: id,
+									 x: objects[key].x, y: objects[key].y,
+									 rotation: objects[key].rotation,
+									 health: objects[key].health || 1
+									 };
 			}else{
 				object_list[key].x = objects[key].x;
 				object_list[key].y = objects[key].y;
 				object_list[key].rotation = objects[key].rotation;
 				object_list[key].health = objects[key].health || 1;
+			}
+		}
+		// 送られたきた情報を元にローカルに存在しないものをサーバから削除
+		if(Object.keys(objects).length != 0){
+			for(key in object_list){
+				if(object_list[key].owner_id == id && !(objects[key])){
+					delete object_list[key];
+				}
 			}
 		}
 		socket.broadcast.emit("s2c_Update", {object_list: object_list});
