@@ -48,6 +48,7 @@ io.on('connection', function (socket) {
 			}
 		}
 		// 送られたきた情報を元にローカルに存在しないものをサーバから削除
+		/*
 		if(Object.keys(objects).length != 0){
 			for(key in object_list){
 				if(object_list[key].owner_id == id && !(objects[key])){
@@ -55,6 +56,7 @@ io.on('connection', function (socket) {
 				}
 			}
 		}
+		*/
 		socket.broadcast.emit("s2c_Update", {object_list: object_list});
 	});
 

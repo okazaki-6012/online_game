@@ -6,7 +6,7 @@ window.onload = function() {
 	// 接続
 	var socket = io.connect(url);
 	var player_id = "User" + Math.floor(Math.random()*10000);
-	var local_objects = {};
+	var local_objects = {}, update_objects = {};
 
 	function socketInit(){
 		// サーバからデータを受け取り更新
@@ -34,7 +34,6 @@ window.onload = function() {
 															 server_objects[key].y,
 															 server_objects[key].rotation,
 															 server_objects[key].owner_id );
-							console.log(server_objects[key]);
 							break;
 						default:
 							break;
@@ -78,7 +77,6 @@ window.onload = function() {
 	}
 
 	var player, energy_bar, hp_bar;
-
 	// ロケット
 	var Rocket = function ( game, x, y, image, id, type ){
 		// スプライト設定
@@ -92,7 +90,6 @@ window.onload = function() {
 				// ユーザID
 		this.owner_id = id;
 		this.type = type;
-
 		game.add.existing(this);
 	};
 	Rocket.prototype = Object.create(Phaser.Sprite.prototype);
@@ -105,9 +102,9 @@ window.onload = function() {
 		this.ACCELERATION = 8;
 		this.MAX_SPEED_X = 250;
 		this.MAX_SPEED_Y = 250;
-		this.ROTATION_SPEED = 180;
+		this.ROTATION_SPEED = 0.05;
 		this.ROTATION_OFF_SET = -1.57;
-		this.USE_ENERGY = 1;
+		this.USE_ENERGY = 0;
 		// 速度
 		this.speed_x = 0;
 		this.speed_y = 0;
@@ -140,12 +137,12 @@ window.onload = function() {
 				var x = this.x + Math.sin(this.rotation) * 60;
 				var y = this.y - Math.cos(this.rotation) * 60;
 				var bullet = new Bullet(game, x, y, this.rotation, this.owner_id);
-				local_objects[bullet.id] = {type: bullet.type, x: bullet.x, y: bullet.y, rotation: bullet.rotation, owner_id: this.owner_id};
-				console.log(local_objects);
+				update_objects[bullet.id] = {type: bullet.type, x: bullet.x, y: bullet.y, rotation: bullet.rotation, owner_id: this.owner_id};
 			}
 		}
 		// 弾を撃つキーの設定
 		keys.space.onDown.add(fireBullet, this);
+		console.log(this);
 	};
 	PlayerRocket.prototype = Object.create(Rocket.prototype);
 	PlayerRocket.prototype.constructor = PlayerRocket;
@@ -156,11 +153,9 @@ window.onload = function() {
 		if (this.y < 0) this.y = this.game.height;
 		// 左右の回転
 		if (keys.left.isDown){
-			this.body.angularVelocity = -this.ROTATION_SPEED;
+			this.rotation -= this.ROTATION_SPEED;
 		}else if (keys.right.isDown){
-			this.body.angularVelocity = this.ROTATION_SPEED;
-		}else{
-			this.body.angularVelocity = 0;
+			this.rotation += this.ROTATION_SPEED;
 		}
 
 		// 加速
@@ -184,6 +179,17 @@ window.onload = function() {
 			this.x += this.speed_x * this.friction;
 			this.y += this.speed_y * this.friction;
 		}
+
+		/*
+		for(key in local_objects){
+			if(local_objects[key].owner_id != this.owner_id){
+				if (local_objects[key].type != "user" && checkOverlap(this, local_objects[key])){
+					this.health--;
+					console.log(this.health);
+				}
+			}
+		}
+		*/
 	}
 
 	// 弾
@@ -197,6 +203,7 @@ window.onload = function() {
 		// ID
 		this.id = "bullet" + Math.floor(Math.random()*10000);
 		this.type = "bullet";
+		this.owner_id = id;
 		// 中心
 		this.anchor.setTo(0.5, 0.5);
 		// 物理演算
@@ -205,6 +212,8 @@ window.onload = function() {
 		this.rotation = rotate;
 		// 発射
 		game.add.existing(this);
+		this.game.add.group();
+		this.enableBody = true;
 	}
 	Bullet.prototype = Object.create(Phaser.Sprite.prototype);
 	Bullet.prototype.constructor = Bullet;
@@ -218,21 +227,34 @@ window.onload = function() {
 			delete local_objects[this.id];
 			this.destroy();
 		}
-
-		if( game.physics.arcade.collide(this, player) ){
-			console.log(1);
-		}
+		/*
+		for(key in local_objects){
+			if(local_objects[key].owner_id != player_id){
+				console.log(local_objects[key]);
+				if (checkOverlap(this, local_objects[key])){
+					delete local_objects[this.id];
+					this.destroy();
+				}
+			}
+		}*/
 	};
-	
+
 	function setupKeys (game){
 		// UP, DOWN, LEFT, RIGHT
 		this.keys = game.input.keyboard.createCursorKeys();
 		// SPACE
 		this.keys["space"] = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
 		return this.keys;
-	};
+	}
+
+	function checkOverlap(spriteA, spriteB) {
+		var boundsA = spriteA.getBounds();
+		var boundsB = spriteB.getBounds();
+		return Phaser.Rectangle.intersects(boundsA, boundsB);
+	}
 
     function create () {
+		game.time.desiredFps = 30;
 		game.stage.disableVisibilityChange = true;
 		// 背景色
 		game.stage.backgroundColor = 0x333333;
@@ -267,14 +289,14 @@ window.onload = function() {
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 
 		// 更新処理
-		local_objects[player_id] = {type: player.type, x: player.x, y: player.y, rotation: player.rotation, health: player.health, owner_id: player_id};
-		var update_objects = {};
+		update_objects[player_id] = {type: player.type, x: player.x, y: player.y, rotation: player.rotation, health: player.health, owner_id: player_id};
+		/*
 		for(key in local_objects){
 			if(local_objects[key].owner_id == player_id){
 				update_objects[key] = local_objects[key];
 			}
 		}
-
+		*/
 		socket.emit("c2s_Update", update_objects);
 	}
 	
