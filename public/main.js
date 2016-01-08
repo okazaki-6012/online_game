@@ -14,7 +14,7 @@ window.onload = function() {
 			var server_objects = data.object_list || {};
 			// サーバ内のオブジェクトを確認
 			for(key in server_objects){
-				if(server_objects[key].owner_id != player_id){
+				if(key != player_id){
 					// ローカルに存在するか、確認
 					if(!local_objects[key]){
 						// 存在しない場合、生成
@@ -33,6 +33,7 @@ window.onload = function() {
 															 server_objects[key].x,
 															 server_objects[key].y,
 															 server_objects[key].rotation,
+															 server_objects[key].id,
 															 server_objects[key].owner_id );
 							break;
 						default:
@@ -48,17 +49,13 @@ window.onload = function() {
 					}
 				}
 			}
-			
-			// サーバに無いローカル上のものを削除
-			if(Object.keys(server_objects).length != 0){
-				for(key in local_objects){
-					if(local_objects[key].owner_id != player_id && !(server_objects[key])){
-						local_objects[key].destroy();
-						delete local_objects[key];
-					}
-				}
-			}
 		});
+
+		socket.on("s2c_RemoveObject", function (data) {
+			local_objects[data.id].destroy();
+			delete local_objects[data.id];
+			if(update_objects[data.id]) delete update_objects[data.id]
+		});		
 
 		function Start(id) {
 			socket.emit("c2s_Start", id);	
@@ -87,7 +84,9 @@ window.onload = function() {
 		this.anchor.setTo(0.5, 0.5);
 		// 物理演算
 		this.game.physics.enable(this, Phaser.Physics.ARCADE);
-				// ユーザID
+		// ユーザID
+		this.id = id
+		// 所有者ID
 		this.owner_id = id;
 		this.type = type;
 		game.add.existing(this);
@@ -136,13 +135,13 @@ window.onload = function() {
 				this.energy -= (this.USE_ENERGY*10);
 				var x = this.x + Math.sin(this.rotation) * 60;
 				var y = this.y - Math.cos(this.rotation) * 60;
-				var bullet = new Bullet(game, x, y, this.rotation, this.owner_id);
-				update_objects[bullet.id] = {type: bullet.type, x: bullet.x, y: bullet.y, rotation: bullet.rotation, owner_id: this.owner_id};
+				var id = "bullet" + Math.floor(Math.random()*10000);
+				update_objects[id] = {id: id, type: "bullet", x: x, y: y, rotation: this.rotation, owner_id: this.owner_id};
+				socket.emit("c2s_AddObject", update_objects[id]);
 			}
 		}
 		// 弾を撃つキーの設定
 		keys.space.onDown.add(fireBullet, this);
-		console.log(this);
 	};
 	PlayerRocket.prototype = Object.create(Rocket.prototype);
 	PlayerRocket.prototype.constructor = PlayerRocket;
@@ -180,6 +179,10 @@ window.onload = function() {
 			this.y += this.speed_y * this.friction;
 		}
 
+		// 更新処理
+		update_objects[this.id] = { x: this.x, y: this.y,
+									rotation: this.rotation,
+									health: this.health };
 		/*
 		for(key in local_objects){
 			if(local_objects[key].owner_id != this.owner_id){
@@ -193,17 +196,17 @@ window.onload = function() {
 	}
 
 	// 弾
-	var Bullet = function ( game, x, y, rotate, id ){
+	var Bullet = function ( game, x, y, rotate, id, owner_id ){
 		this.ROTATION_OFF_SET = -1.57;
 		this.ACCELERATION = 5;
 		// スプライト設定
 		Phaser.Sprite.call(this, game, x, y, 'bullet');
 		// 画像サイズ
 		this.scale.setTo(0.3, 0.3);
-		// ID
-		this.id = "bullet" + Math.floor(Math.random()*10000);
 		this.type = "bullet";
-		this.owner_id = id;
+		// ID
+		this.id = id
+		this.owner_id = owner_id;
 		// 中心
 		this.anchor.setTo(0.5, 0.5);
 		// 物理演算
@@ -220,23 +223,18 @@ window.onload = function() {
 	Bullet.prototype.update = function() {
 		this.x += Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 		this.y += Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
-		if (this.x < 0 || this.x > this.game.width){
-			delete local_objects[this.id];
-			this.destroy();
-		}else if (this.y < 0 || this.y > this.game.height){
-			delete local_objects[this.id];
-			this.destroy();
-		}
-		/*
 		for(key in local_objects){
-			if(local_objects[key].owner_id != player_id){
-				console.log(local_objects[key]);
+			if(local_objects[key].owner_id != this.owner_id){
 				if (checkOverlap(this, local_objects[key])){
-					delete local_objects[this.id];
-					this.destroy();
+					socket.emit("c2s_RemoveObject", update_objects[this.id]);
 				}
 			}
-		}*/
+		}
+		if (this.x < 0 || this.x > this.game.width){
+			if(this.owner_id == player_id) socket.emit("c2s_RemoveObject", update_objects[this.id]);
+		}else if (this.y < 0 || this.y > this.game.height){
+			if(this.owner_id == player_id) socket.emit("c2s_RemoveObject", update_objects[this.id]);
+		}
 	};
 
 	function setupKeys (game){
@@ -264,7 +262,7 @@ window.onload = function() {
 		// playerの設定
 		// スプライト設定
 		player = new PlayerRocket(game, Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), "player", player_id, "user");
-		// game.add.sprite( Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), 'player' );
+		// game.add.sprite( Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), 'player' );	
 		
 		// HPゲージ
 		var hp_bar_bg = game.add.graphics(50, 30);
@@ -288,15 +286,6 @@ window.onload = function() {
 		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 
-		// 更新処理
-		update_objects[player_id] = {type: player.type, x: player.x, y: player.y, rotation: player.rotation, health: player.health, owner_id: player_id};
-		/*
-		for(key in local_objects){
-			if(local_objects[key].owner_id == player_id){
-				update_objects[key] = local_objects[key];
-			}
-		}
-		*/
 		socket.emit("c2s_Update", update_objects);
 	}
 	
