@@ -20,32 +20,32 @@ window.onload = function() {
 						// 存在しない場合、生成
 						switch (server_objects[key].type){
 						case "user": 
-				  			// スプライトを生成
-							local_objects[key] = new Rocket( game,
-															 server_objects[key].x,
-															 server_objects[key].y,
-															 "enemy",
-															 server_objects[key].owner_id,
-															 "user" );
-							break;
+				  		    // スプライトを生成
+						    local_objects[key] = new Rocket( game,
+										     server_objects[key].x,
+										     server_objects[key].y,
+										     "enemy",
+										     server_objects[key].owner_id,
+										     "user" );
+						    break;
 						case "bullet":
-							local_objects[key] = new Bullet( game,
-															 server_objects[key].x,
-															 server_objects[key].y,
-															 server_objects[key].rotation,
-															 server_objects[key].id,
-															 server_objects[key].owner_id );
-							break;
+						    local_objects[key] = new Bullet( game,
+										     server_objects[key].x,
+										     server_objects[key].y,
+										     server_objects[key].rotation,
+										     server_objects[key].id,
+										     server_objects[key].owner_id );
+						    break;
 						default:
-							break;
+						    break;
 						}
 					}else{
-						// 存在する場合、更新
-						if(server_objects[key].type == "user"){
+					    // 存在する場合、更新
+					    if(server_objects[key].type == "user"){
 							local_objects[key].x = server_objects[key].x;
 							local_objects[key].y = server_objects[key].y;
 							local_objects[key].rotation = server_objects[key].rotation;
-						}
+					    }
 					}
 				}
 			}
@@ -183,7 +183,7 @@ window.onload = function() {
 		update_objects[this.id] = { x: this.x, y: this.y,
 									rotation: this.rotation,
 									health: this.health };
-		/*
+	    /*
 		for(key in local_objects){
 			if(local_objects[key].owner_id != this.owner_id){
 				if (local_objects[key].type != "user" && checkOverlap(this, local_objects[key])){
@@ -244,13 +244,22 @@ window.onload = function() {
 		this.keys["space"] = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
 		return this.keys;
 	}
-
+/*
 	function checkOverlap(spriteA, spriteB) {
 		var boundsA = spriteA.getBounds();
 		var boundsB = spriteB.getBounds();
 		return Phaser.Rectangle.intersects(boundsA, boundsB);
 	}
-
+*/
+	function checkOverlap(objA, objB) {
+		var bodyA = { x: objA.x, y: objA.y, width: objA.width, height: objA.height };
+		var bodyB = { x: objB.x, y: objB.y, width: objB.width, height: objB.height };
+		if( (bodyA.x < (bodyB.x + bodyB.width/4.5) && bodyA.x > (bodyB.x - bodyB.width/4.5))
+			&& (bodyA.y < (bodyB.y + bodyB.height/4.5) && bodyA.y > (bodyB.y - bodyB.height/4.5)) ){
+			console.log("true");
+		}
+	}
+	
     function create () {
 		game.time.desiredFps = 30;
 		game.stage.disableVisibilityChange = true;
