@@ -12,6 +12,7 @@ window.onload = function() {
 		// サーバからデータを受け取り更新
 		socket.on("s2c_Update", function (data) {
 			var server_objects = data.object_list || {};
+			var all_update = data.all_update;
 			// サーバ内のオブジェクトを確認
 			for(key in server_objects){
 				if(key != player_id){
@@ -41,7 +42,7 @@ window.onload = function() {
 						}
 					}else{
 					    // 存在する場合、更新
-					    if(server_objects[key].type == "user"){
+					    if(server_objects[key].type == "user" || all_update == 1){
 							local_objects[key].x = server_objects[key].x;
 							local_objects[key].y = server_objects[key].y;
 							local_objects[key].rotation = server_objects[key].rotation;
@@ -54,8 +55,21 @@ window.onload = function() {
 		socket.on("s2c_RemoveObject", function (data) {
 			local_objects[data.id].destroy();
 			delete local_objects[data.id];
-			if(update_objects[data.id]) delete update_objects[data.id]
-		});		
+			if(update_objects[data.id]) delete update_objects[data.id];
+		});
+
+		
+		socket.on("s2c_Start", function (data) {
+			console.log(update_objects);
+			console.log(local_objects);
+			for(key in update_objects){
+				if(key != player_id){
+					update_objects[key]["x"] = local_objects[key].x;
+					update_objects[key]["y"] = local_objects[key].y;
+					socket.emit("c2s_Update", update_objects[key], 1);
+				}
+			}
+		});
 
 		function Start(id) {
 			socket.emit("c2s_Start", id);	
@@ -217,6 +231,7 @@ window.onload = function() {
 		game.add.existing(this);
 		this.game.add.group();
 		this.enableBody = true;
+
 	}
 	Bullet.prototype = Object.create(Phaser.Sprite.prototype);
 	Bullet.prototype.constructor = Bullet;
@@ -230,11 +245,10 @@ window.onload = function() {
 				}
 			}
 		}
-		if (this.x < 0 || this.x > this.game.width){
-			if(this.owner_id == player_id) socket.emit("c2s_RemoveObject", update_objects[this.id]);
-		}else if (this.y < 0 || this.y > this.game.height){
+		if ( (this.x < 0 || this.x > this.game.width) || (this.y < 0 || this.y > this.game.height) ){
 			if(this.owner_id == player_id) socket.emit("c2s_RemoveObject", update_objects[this.id]);
 		}
+		
 	};
 
 	function setupKeys (game){
@@ -295,7 +309,7 @@ window.onload = function() {
 		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 
-		socket.emit("c2s_Update", update_objects);
+		socket.emit("c2s_Update", update_objects, 0);
 	}
 	
 	// イベントハンドラ（コールバック関数）
