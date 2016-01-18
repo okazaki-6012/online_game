@@ -9,6 +9,16 @@ window.onload = function() {
 	var local_objects = {}, update_objects = {};
 
 	function socketInit(){
+		socket.on("s2c_Start", function (data) {
+			for(key in update_objects){
+				if(key != player_id){
+					update_objects[key]["x"] = local_objects[key].x;
+					update_objects[key]["y"] = local_objects[key].y;
+					socket.emit("c2s_Update", update_objects[key], 1);
+				}
+			}
+		});
+
 		// サーバからデータを受け取り更新
 		socket.on("s2c_Update", function (data) {
 			var server_objects = data.object_list || {};
@@ -23,19 +33,26 @@ window.onload = function() {
 						case "user": 
 				  		    // スプライトを生成
 						    local_objects[key] = new Rocket( game,
-										     server_objects[key].x,
-										     server_objects[key].y,
-										     "enemy",
-										     server_objects[key].owner_id,
-										     "user" );
+															 server_objects[key].x,
+															 server_objects[key].y,
+															 "enemy",
+															 server_objects[key].owner_id,
+															 "user" );
 						    break;
 						case "bullet":
+							var date = Date.now();
 						    local_objects[key] = new Bullet( game,
-										     server_objects[key].x,
-										     server_objects[key].y,
-										     server_objects[key].rotation,
-										     server_objects[key].id,
-										     server_objects[key].owner_id );
+															 server_objects[key].x,
+															 server_objects[key].y,
+															 server_objects[key].rotation,
+															 server_objects[key].id,
+															 server_objects[key].owner_id );
+							console.log(date - server_objects[key].date);
+							var speed_x = Math.cos(local_objects[key].rotation + local_objects[key].ROTATION_OFF_SET) * local_objects[key].ACCELERATION;
+							var speed_y = Math.sin(local_objects[key].rotation + local_objects[key].ROTATION_OFF_SET) * local_objects[key].ACCELERATION;
+							// 時間と速さから距離を出す(未完成)
+							local_objects[key].x += speed_x * (date - server_objects[key].date);
+							local_objects[key].y += speed_y * (date - server_objects[key].date);
 						    break;
 						default:
 						    break;
@@ -58,19 +75,6 @@ window.onload = function() {
 			if(update_objects[data.id]) delete update_objects[data.id];
 		});
 
-		
-		socket.on("s2c_Start", function (data) {
-			console.log(update_objects);
-			console.log(local_objects);
-			for(key in update_objects){
-				if(key != player_id){
-					update_objects[key]["x"] = local_objects[key].x;
-					update_objects[key]["y"] = local_objects[key].y;
-					socket.emit("c2s_Update", update_objects[key], 1);
-				}
-			}
-		});
-
 		function Start(id) {
 			socket.emit("c2s_Start", id);	
 		}
@@ -79,7 +83,7 @@ window.onload = function() {
 
 // === ゲームに関する処理 ===
 	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
-	
+
 	// 素材読み込み
 	function preload () {
 		game.load.image('enemy', 'asset/enemy.png');
@@ -150,7 +154,7 @@ window.onload = function() {
 				var x = this.x + Math.sin(this.rotation) * 60;
 				var y = this.y - Math.cos(this.rotation) * 60;
 				var id = "bullet" + Math.floor(Math.random()*10000);
-				update_objects[id] = {id: id, type: "bullet", x: x, y: y, rotation: this.rotation, owner_id: this.owner_id};
+				update_objects[id] = {id: id, type: "bullet", date: Date.now(), x: x, y: y, rotation: this.rotation, owner_id: this.owner_id};
 				socket.emit("c2s_AddObject", update_objects[id]);
 			}
 		}
@@ -195,8 +199,7 @@ window.onload = function() {
 
 		// 更新処理
 		update_objects[this.id] = { x: this.x, y: this.y,
-									rotation: this.rotation,
-									health: this.health };
+									rotation: this.rotation };
 	    /*
 		for(key in local_objects){
 			if(local_objects[key].owner_id != this.owner_id){
@@ -231,7 +234,6 @@ window.onload = function() {
 		game.add.existing(this);
 		this.game.add.group();
 		this.enableBody = true;
-
 	}
 	Bullet.prototype = Object.create(Phaser.Sprite.prototype);
 	Bullet.prototype.constructor = Bullet;
@@ -310,10 +312,5 @@ window.onload = function() {
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 
 		socket.emit("c2s_Update", update_objects, 0);
-	}
-	
-	// イベントハンドラ（コールバック関数）
-	function collisionHandler (obj1, obj2) {
-		console.log("hey");
-	}
+	}	
 };

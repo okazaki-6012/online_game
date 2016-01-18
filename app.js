@@ -21,7 +21,7 @@ io.on('connection', function (socket) {
 	socket.on("c2s_Start", function ( id ) {
 		socket.broadcast.emit("s2c_Start", {});
 		console.log("connect:" + id);
-		object_list[id] = {id: id, type: "user", owner_id: id};
+		object_list[id] = {id: id, date: Date.now(), type: "user", owner_id: id};
 		user_list[socket.id] = id;
 		console.log("connect_list");
 		for(key in user_list) {
@@ -35,8 +35,9 @@ io.on('connection', function (socket) {
 		var id = user_list[socket.id];
 		console.log("Add: ");
 		console.log(object);
-		object_list[object.id] = { type: object.type, owner_id: object.owner_id,
-								   x: object.x, y: object.y, id: object.id,
+		object_list[object.id] = { id: object.id, type: object.type,
+								   date: object.date, owner_id: object.owner_id,
+								   x: object.x, y: object.y,
 								   rotation: object.rotation,
 								   health: object.health || 1
 								 };
