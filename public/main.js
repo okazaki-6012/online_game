@@ -9,6 +9,16 @@ window.onload = function() {
 	var local_objects = {}, update_objects = {};
 
 	function socketInit(){
+		// 定期的、弾の座標送信
+		var timer = window.setInterval(function (){
+			for(key in update_objects){
+				if(key != player_id){
+					update_objects[key]["x"] = local_objects[key].x;
+					update_objects[key]["y"] = local_objects[key].y;
+					socket.emit("c2s_Update", update_objects[key], false);
+				}
+			}
+		} , 500);
 		socket.on("s2c_Start", function (data) {
 			for(key in update_objects){
 				if(key != player_id){
@@ -22,7 +32,6 @@ window.onload = function() {
 		// サーバからデータを受け取り更新
 		socket.on("s2c_Update", function (data) {
 			var server_objects = data.object_list || {};
-			var all_update = data.all_update;
 			// サーバ内のオブジェクトを確認
 			for(key in server_objects){
 				if(key != player_id){
@@ -47,19 +56,13 @@ window.onload = function() {
 															 server_objects[key].rotation,
 															 server_objects[key].id,
 															 server_objects[key].owner_id );
-							console.log(date - server_objects[key].date);
-							var speed_x = Math.cos(local_objects[key].rotation + local_objects[key].ROTATION_OFF_SET) * local_objects[key].ACCELERATION;
-							var speed_y = Math.sin(local_objects[key].rotation + local_objects[key].ROTATION_OFF_SET) * local_objects[key].ACCELERATION;
-							// 時間と速さから距離を出す(未完成)
-							local_objects[key].x += speed_x * (date - server_objects[key].date);
-							local_objects[key].y += speed_y * (date - server_objects[key].date);
 						    break;
 						default:
 						    break;
 						}
 					}else{
 					    // 存在する場合、更新
-					    if(server_objects[key].type == "user" || all_update == 1){
+					    if(server_objects[key].type == "user"){
 							local_objects[key].x = server_objects[key].x;
 							local_objects[key].y = server_objects[key].y;
 							local_objects[key].rotation = server_objects[key].rotation;
@@ -287,7 +290,7 @@ window.onload = function() {
 		// playerの設定
 		// スプライト設定
 		player = new PlayerRocket(game, Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), "player", player_id, "user");
-		// game.add.sprite( Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), 'player' );	
+		// game.add.sprite( Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), 'player' );
 		
 		// HPゲージ
 		var hp_bar_bg = game.add.graphics(50, 30);
@@ -311,6 +314,6 @@ window.onload = function() {
 		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 
-		socket.emit("c2s_Update", update_objects, 0);
+		socket.emit("c2s_Update", update_objects, true);
 	}	
 };
