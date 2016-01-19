@@ -19,15 +19,6 @@ window.onload = function() {
 				}
 			}
 		} , 500);
-		socket.on("s2c_Start", function (data) {
-			for(key in update_objects){
-				if(key != player_id){
-					update_objects[key]["x"] = local_objects[key].x;
-					update_objects[key]["y"] = local_objects[key].y;
-					socket.emit("c2s_Update", update_objects[key], 1);
-				}
-			}
-		});
 
 		// サーバからデータを受け取り更新
 		socket.on("s2c_Update", function (data) {
