@@ -11,11 +11,11 @@ var object_list = {};
 var user_list = {};
 
 // クライアント接続があると、以下の処理をさせる。
-io.on('connection', function (socket) {
+io.sockets.on('connection', function (socket) {
 	var user_num = Object.keys(user_list).length+1;
 	console.log("接続数：" + user_num);
 	// サーバに保持しているデータを返す
-	io.emit("s2c_Update", {object_list: object_list});
+	io.sockets.emit("s2c_Update", {object_list: object_list});
 
 	// クライアントからの接続受信
 	socket.on("c2s_Start", function ( id ) {
@@ -40,7 +40,7 @@ io.on('connection', function (socket) {
 								   rotation: object.rotation,
 								   health: object.health || 1
 								 };
-		socket.emit("s2c_Update", {object_list: object_list, all_update: 0});
+		socket.emit("s2c_Update", {object_list: object_list});
 	});
 
 	// 受信した情報でオブジェクトをサーバから削除
@@ -49,10 +49,10 @@ io.on('connection', function (socket) {
 			console.log("Delete: ");
 			console.log(object);
 			delete object_list[object.id];
-			socket.emit("s2c_RemoveObject", object);
+			io.sockets.emit("s2c_RemoveObject", object);
 		}
 	});
-	
+
 	// 更新処理(　オブジェクト, 更新送信の有無 ) ... 座標, 向きを更新
 	socket.on("c2s_Update", function ( objects, flag ) {
 		for(key in objects){

@@ -64,6 +64,7 @@ window.onload = function() {
 		});
 
 		socket.on("s2c_RemoveObject", function (data) {
+			console.log(data);
 			local_objects[data.id].destroy();
 			delete local_objects[data.id];
 			if(update_objects[data.id]) delete update_objects[data.id];
@@ -114,7 +115,8 @@ window.onload = function() {
 		this.MAX_SPEED_Y = 250;
 		this.ROTATION_SPEED = 0.05;
 		this.ROTATION_OFF_SET = -1.57;
-		this.USE_ENERGY = 0;
+		this.USE_ENERGY = 1;
+		this.DAMEGE = 10;
 		// 速度
 		this.speed_x = 0;
 		this.speed_y = 0;
@@ -134,7 +136,7 @@ window.onload = function() {
 			}
 			// Healthの回復
 			if(this.health < this.maxHealth){
-				this.health += 0.2;
+				this.health += 0.5;
 			}
 		}
 		// ループ処理( 250ミリ秒毎 )
@@ -190,6 +192,18 @@ window.onload = function() {
 			this.y += this.speed_y * this.friction || 0;
 		}
 
+		for(key in local_objects){
+			if(local_objects[key].owner_id != this.owner_id && local_objects[key].type == "bullet"){
+				if (checkOverlap(this, local_objects[key])){
+					if(this.health - this.DAMEGE > 0)
+						this.health -= this.DAMEGE;
+					else
+						this.health = 0;
+					socket.emit("c2s_RemoveObject", {id: local_objects[key].id});
+				}
+			}
+		}
+		
 		// 更新処理
 		update_objects[this.id] = { x: this.x, y: this.y,
 									rotation: this.rotation };
@@ -223,14 +237,17 @@ window.onload = function() {
 	Bullet.prototype.update = function() {
 		this.x += Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 		this.y += Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
+/*
 		for(key in local_objects){
-			if(local_objects[key].owner_id != this.owner_id){
+			if(local_objects[key].owner_id != this.owner_id && local_objects[key].type == "user"){
 				if (checkOverlap(this, local_objects[key])){
 					console.log(update_objects[this.id]);
+					local_objects[key].health -= 10;
 					socket.emit("c2s_RemoveObject", update_objects[this.id]);
 				}
 			}
 		}
+*/
 		if ( (this.x < 0 || this.x > this.game.width) || (this.y < 0 || this.y > this.game.height) ){
 			if(this.owner_id == player_id) socket.emit("c2s_RemoveObject", update_objects[this.id]);
 		}
