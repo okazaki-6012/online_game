@@ -12,7 +12,7 @@ window.onload = function() {
 		// 定期的、弾の座標送信
 		var timer = window.setInterval(function (){
 			for(key in update_objects){
-				if(key != player_id){
+				if(key != player_id && local_objects[key]){
 					update_objects[key]["x"] = local_objects[key].x;
 					update_objects[key]["y"] = local_objects[key].y;
 					socket.emit("c2s_Update", update_objects[key], false);
@@ -76,7 +76,7 @@ window.onload = function() {
 	}
 
 // === ゲームに関する処理 ===
-	var game = new Phaser.Game(800, 600, Phaser.AUTO, '', { preload: preload, create: create, update: update });
+	var game = new Phaser.Game(1024, 480, Phaser.AUTO, '', { preload: preload, create: create, update: update });
 
 	// 素材読み込み
 	function preload () {
@@ -85,7 +85,6 @@ window.onload = function() {
 		game.load.image('bullet', 'asset/bullet.png');
 	}
 
-	var player, energy_bar, hp_bar;
 	// ロケット
 	var Rocket = function ( game, x, y, image, id, type ){
 		// スプライト設定
@@ -187,23 +186,13 @@ window.onload = function() {
 
 		// 移動
 		if(this.friction >= 0){
-			this.x += this.speed_x * this.friction;
-			this.y += this.speed_y * this.friction;
+			this.x += this.speed_x * this.friction || 0;
+			this.y += this.speed_y * this.friction || 0;
 		}
 
 		// 更新処理
 		update_objects[this.id] = { x: this.x, y: this.y,
 									rotation: this.rotation };
-	    /*
-		for(key in local_objects){
-			if(local_objects[key].owner_id != this.owner_id){
-				if (local_objects[key].type != "user" && checkOverlap(this, local_objects[key])){
-					this.health--;
-					console.log(this.health);
-				}
-			}
-		}
-		*/
 	}
 
 	// 弾
@@ -237,6 +226,7 @@ window.onload = function() {
 		for(key in local_objects){
 			if(local_objects[key].owner_id != this.owner_id){
 				if (checkOverlap(this, local_objects[key])){
+					console.log(update_objects[this.id]);
 					socket.emit("c2s_RemoveObject", update_objects[this.id]);
 				}
 			}
@@ -264,12 +254,14 @@ window.onload = function() {
 	function checkOverlap(objA, objB) {
 		var bodyA = { x: objA.x, y: objA.y, width: objA.width, height: objA.height };
 		var bodyB = { x: objB.x, y: objB.y, width: objB.width, height: objB.height };
-		if( (bodyA.x < (bodyB.x + bodyB.width/4.5) && bodyA.x > (bodyB.x - bodyB.width/4.5))
-			&& (bodyA.y < (bodyB.y + bodyB.height/4.5) && bodyA.y > (bodyB.y - bodyB.height/4.5)) ){
-			console.log("true");
-		}
+		var area = 25;
+		if( (bodyA.x <= (bodyB.x + area) && bodyA.x >= (bodyB.x - area))
+			&& (bodyA.y <= (bodyB.y + area) && bodyA.y >= (bodyB.y - area)) ){
+			return true;
+		}else{ return false; }
 	}
-	
+
+	var player;
     function create () {
 		game.time.desiredFps = 30;
 		game.stage.disableVisibilityChange = true;
@@ -280,28 +272,24 @@ window.onload = function() {
 		console.log(keys);
 		// playerの設定
 		// スプライト設定
-		player = new PlayerRocket(game, Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), "player", player_id, "user");
-		// game.add.sprite( Math.floor(Math.random()*800+20), Math.floor(Math.random()*600+20), 'player' );
+		player = new PlayerRocket(game, Math.floor(Math.random()* game.width), Math.floor(Math.random()* game.height), "player", player_id, "user");
 		
 		// HPゲージ
-		var hp_bar_bg = game.add.graphics(50, 30);
-		hp_bar_bg.lineStyle(16, 0xff0000, 0.8);
-		hp_bar_bg.lineTo(player.maxHealth, 0);
+		game.add.graphics(50, 30).lineStyle(16, 0xff0000, 0.8).lineTo(player.maxHealth, 0);
 		hp_bar = game.add.graphics(50, 30);
 
 		// powerゲージ
-		var energy_bar_bg = game.add.graphics(80, 53);
-		energy_bar_bg.lineStyle(16, 0xff0000, 0.8);
-		energy_bar_bg.lineTo(player.maxEnergy, 0);
+		game.add.graphics(80, 53).lineStyle(16, 0xff0000, 0.8).lineTo(player.maxEnergy, 0);
 		energy_bar = game.add.graphics(80, 53);
-		
+
 		// テキスト
-		text = game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
+		game.add.text(20, 20, "HP: \n" + "Energy: ", { font: "16px Arial", fill: "#EEE" });
+
 		socketInit();
 	}
-
+	
 	function update() {
-		// ゲージの表示
+		// ゲージの表示を更新
 		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
 		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
 

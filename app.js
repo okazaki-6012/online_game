@@ -45,9 +45,9 @@ io.on('connection', function (socket) {
 
 	// 受信した情報でオブジェクトをサーバから削除
 	socket.on("c2s_RemoveObject", function ( object ) {
-		console.log("Delete: ");
-		console.log(object);
 		if( object && object_list[object.id] ){
+			console.log("Delete: ");
+			console.log(object);
 			delete object_list[object.id];
 			socket.emit("s2c_RemoveObject", object);
 		}
