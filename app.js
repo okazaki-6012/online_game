@@ -20,7 +20,6 @@ io.sockets.on('connection', function (socket) {
 	// クライアントからの接続受信
 	socket.on("c2s_Start", function ( id ) {
 		console.log("connect:" + id);
-		object_list[id] = {id: id, date: Date.now(), type: "user", owner_id: id};
 		user_list[socket.id] = id;
 		console.log("connect_list");
 		for(key in user_list) {
@@ -54,7 +53,7 @@ io.sockets.on('connection', function (socket) {
 	});
 
 	// 更新処理(　オブジェクト, 更新送信の有無 ) ... 座標, 向きを更新
-	socket.on("c2s_Update", function ( objects, flag ) {
+	socket.on("c2s_Update", function ( objects ) {
 		for(key in objects){
 			if(object_list[key]){
 				object_list[key].x = objects[key].x;
@@ -62,7 +61,7 @@ io.sockets.on('connection', function (socket) {
 				object_list[key].rotation = objects[key].rotation;
 			}
 		}
-		if(flag) socket.broadcast.emit("s2c_Update", {object_list: object_list});
+		socket.broadcast.emit("s2c_Update", {object_list: object_list});
 	});
 	
 	// 接続切れイベントを設定

@@ -10,12 +10,11 @@ window.onload = function() {
 
 	function socketInit(){
 		// 定期的、弾の座標送信
-		var timer = window.setInterval(function (){
+		var push_timer = window.setInterval(function (){
 			for(key in update_objects){
 				if(key != player_id && local_objects[key]){
 					update_objects[key]["x"] = local_objects[key].x;
 					update_objects[key]["y"] = local_objects[key].y;
-					socket.emit("c2s_Update", update_objects[key], false);
 				}
 			}
 		} , 500);
@@ -64,7 +63,6 @@ window.onload = function() {
 		});
 
 		socket.on("s2c_RemoveObject", function (data) {
-			console.log(data);
 			local_objects[data.id].destroy();
 			delete local_objects[data.id];
 			if(update_objects[data.id]) delete update_objects[data.id];
@@ -130,13 +128,15 @@ window.onload = function() {
 		this.energy = 200;
 		
 		function playerRecovery() {
-			// Energyの回復
-			if(this.energy < this.maxEnergy){
-				this.energy++;
-			}
-			// Healthの回復
-			if(this.health < this.maxHealth){
-				this.health += 0.5;
+			if(this.health > 0){
+				// Energyの回復
+				if(this.energy < this.maxEnergy){
+					this.energy++;
+				}
+				// Healthの回復
+				if(this.health < this.maxHealth){
+					this.health += 0.5;
+				}
 			}
 		}
 		// ループ処理( 250ミリ秒毎 )
@@ -144,7 +144,7 @@ window.onload = function() {
 
 		// 弾の発射
 		function fireBullet(){
-			if (this.energy - (this.USE_ENERGY*10) >= 0 ){
+			if (this.energy - (this.USE_ENERGY*10) >= 0 && this.health > 0 ){
 				this.energy -= (this.USE_ENERGY*10);
 				var x = this.x + Math.sin(this.rotation) * 60;
 				var y = this.y - Math.cos(this.rotation) * 60;
@@ -155,6 +155,8 @@ window.onload = function() {
 		}
 		// 弾を撃つキーの設定
 		keys.space.onDown.add(fireBullet, this);
+		update_objects[player_id] = {id: this.id, type: "user", date: Date.now(), x: this.x, y: this.y, rotation: this.rotation, owner_id: id};
+		socket.emit("c2s_AddObject", update_objects[player_id]);
 	};
 	PlayerRocket.prototype = Object.create(Rocket.prototype);
 	PlayerRocket.prototype.constructor = PlayerRocket;
@@ -261,13 +263,7 @@ window.onload = function() {
 		this.keys["space"] = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
 		return this.keys;
 	}
-/*
-	function checkOverlap(spriteA, spriteB) {
-		var boundsA = spriteA.getBounds();
-		var boundsB = spriteB.getBounds();
-		return Phaser.Rectangle.intersects(boundsA, boundsB);
-	}
-*/
+
 	function checkOverlap(objA, objB) {
 		var bodyA = { x: objA.x, y: objA.y, width: objA.width, height: objA.height };
 		var bodyB = { x: objB.x, y: objB.y, width: objB.width, height: objB.height };
@@ -278,7 +274,6 @@ window.onload = function() {
 		}else{ return false; }
 	}
 
-	var player;
     function create () {
 		game.time.desiredFps = 30;
 		game.stage.disableVisibilityChange = true;
@@ -289,14 +284,14 @@ window.onload = function() {
 		console.log(keys);
 		// playerの設定
 		// スプライト設定
-		player = new PlayerRocket(game, Math.floor(Math.random()* game.width), Math.floor(Math.random()* game.height), "player", player_id, "user");
+		local_objects[player_id] = new PlayerRocket(game, Math.floor(Math.random()* game.width), Math.floor(Math.random()* game.height), "player", player_id, "user");
 		
 		// HPゲージ
-		game.add.graphics(50, 30).lineStyle(16, 0xff0000, 0.8).lineTo(player.maxHealth, 0);
+		game.add.graphics(50, 30).lineStyle(16, 0xff0000, 0.8).lineTo(local_objects[player_id].maxHealth, 0);
 		hp_bar = game.add.graphics(50, 30);
 
 		// powerゲージ
-		game.add.graphics(80, 53).lineStyle(16, 0xff0000, 0.8).lineTo(player.maxEnergy, 0);
+		game.add.graphics(80, 53).lineStyle(16, 0xff0000, 0.8).lineTo(local_objects[player_id].maxEnergy, 0);
 		energy_bar = game.add.graphics(80, 53);
 
 		// テキスト
@@ -307,9 +302,19 @@ window.onload = function() {
 	
 	function update() {
 		// ゲージの表示を更新
-		energy_bar.clear().moveTo(0,0).lineStyle(16, 0x00ced1, 0.9).lineTo(player.energy, 0);
-		hp_bar.clear().moveTo(0,0).lineStyle(16, 0x00ff00, 0.9).lineTo(player.health, 0);
-
-		socket.emit("c2s_Update", update_objects, true);
-	}	
+		if(local_objects[player_id]){
+			energy_bar.clear().moveTo(0,0)
+				.lineStyle(16, 0x00ced1, 0.9).lineTo(local_objects[player_id].energy, 0);
+			hp_bar.clear().moveTo(0,0)
+				.lineStyle(16, 0x00ff00, 0.9).lineTo(local_objects[player_id].health, 0);
+			if(local_objects[player_id].health == 0){
+				socket.emit("c2s_RemoveObject", {id: local_objects[player_id].id});
+				var pop_up = confirm("もう一度プレイ致しますか？");
+				if (pop_up == true){
+					local_objects[player_id] = new PlayerRocket(game, Math.floor(Math.random()* game.width), Math.floor(Math.random()* game.height), "player", player_id, "user");
+				}
+			}
+		}
+		socket.emit("c2s_Update", update_objects);
+	}
 };
