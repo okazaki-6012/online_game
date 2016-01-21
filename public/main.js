@@ -1,5 +1,5 @@
-window.onload = function() {
-// === サーバに関する処理 ===
+window.addEventListener("DOMContentLoaded",function() {
+	// === サーバに関する処理 ===
 	// 接続先の指定(192.168.8.89)
 	// var url = "http://192.168.8.89:8080";
 	var url = "http://" + window.location.hostname + ":8080";
@@ -126,7 +126,7 @@ window.onload = function() {
 		// エネルギー
 		this.maxEnergy = 200;
 		this.energy = 200;
-		
+
 		function playerRecovery() {
 			if(this.health > 0){
 				// Energyの回復
@@ -205,7 +205,7 @@ window.onload = function() {
 				}
 			}
 		}
-		
+
 		// 更新処理
 		update_objects[this.id] = { x: this.x, y: this.y,
 									rotation: this.rotation };
@@ -317,4 +317,4 @@ window.onload = function() {
 		}
 		socket.emit("c2s_Update", update_objects);
 	}
-};
+}, false)
