@@ -92,8 +92,6 @@ window.addEventListener("DOMContentLoaded",function() {
 		this.scale.setTo(0.3, 0.3);
 		// 中心
 		this.anchor.setTo(0.5, 0.5);
-		// 物理演算
-		this.game.physics.enable(this, Phaser.Physics.ARCADE);
 		// ユーザID
 		this.id = id
 		// 所有者ID
@@ -225,8 +223,6 @@ window.addEventListener("DOMContentLoaded",function() {
 		this.owner_id = owner_id;
 		// 中心
 		this.anchor.setTo(0.5, 0.5);
-		// 物理演算
-		this.game.physics.enable(this, Phaser.Physics.ARCADE);
 		// 向き
 		this.rotation = rotate;
 		// 発射
@@ -239,17 +235,6 @@ window.addEventListener("DOMContentLoaded",function() {
 	Bullet.prototype.update = function() {
 		this.x += Math.cos(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
 		this.y += Math.sin(this.rotation + this.ROTATION_OFF_SET) * this.ACCELERATION;
-/*
-		for(key in local_objects){
-			if(local_objects[key].owner_id != this.owner_id && local_objects[key].type == "user"){
-				if (checkOverlap(this, local_objects[key])){
-					console.log(update_objects[this.id]);
-					local_objects[key].health -= 10;
-					socket.emit("c2s_RemoveObject", update_objects[this.id]);
-				}
-			}
-		}
-*/
 		if ( (this.x < 0 || this.x > this.game.width) || (this.y < 0 || this.y > this.game.height) ){
 			if(this.owner_id == player_id) socket.emit("c2s_RemoveObject", update_objects[this.id]);
 		}
