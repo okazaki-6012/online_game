@@ -3,7 +3,7 @@ var express = require('express'), http = require('http');
 var app = express(), server = http.createServer(app);
 var io = require('socket.io').listen(server);
 
-server.listen(8080)
+server.listen(4649)
 console.log("starting server");
 
 // ユーザ管理ハッシュ
@@ -14,8 +14,6 @@ var user_list = {};
 io.sockets.on('connection', function (socket) {
 	var user_num = Object.keys(user_list).length+1;
 	console.log("接続数：" + user_num);
-	// サーバに保持しているデータを返す
-	io.sockets.emit("s2c_Update", {object_list: object_list});
 
 	// クライアントからの接続受信
 	socket.on("c2s_Start", function ( id ) {
@@ -26,6 +24,8 @@ io.sockets.on('connection', function (socket) {
 			var u_id = user_list[key];
 			console.log("> " + key + " : " + object_list[u_id]["owner_id"]);
 		}
+		// サーバに保持しているデータを返す
+		io.sockets.socket(socket.id).emit("s2c_Update", {object_list: object_list});
 	});
 
 	// 受信した情報でオブジェクトをサーバへ追加
@@ -52,7 +52,7 @@ io.sockets.on('connection', function (socket) {
 		}
 	});
 
-	// 更新処理(　オブジェクト, 更新送信の有無 ) ... 座標, 向きを更新
+	// 更新処理 ... 座標, 向きを更新
 	socket.on("c2s_Update", function ( objects ) {
 		for(key in objects){
 			if(object_list[key]){

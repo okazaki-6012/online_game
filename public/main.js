@@ -2,7 +2,7 @@ window.addEventListener("DOMContentLoaded",function() {
 	// === サーバに関する処理 ===
 	// 接続先の指定(192.168.8.89)
 	// var url = "http://192.168.8.89:8080";
-	var url = "http://" + window.location.hostname + ":8080";
+	var url = "http://" + window.location.hostname + ":4649";
 	// 接続
 	var socket = io.connect(url);
 	var player_id = "User" + Math.floor(Math.random()*10000);
@@ -112,7 +112,7 @@ window.addEventListener("DOMContentLoaded",function() {
 		this.ROTATION_SPEED = 0.05;
 		this.ROTATION_OFF_SET = -1.57;
 		this.USE_ENERGY = 1;
-		this.DAMEGE = 10;
+		this.DAMEGE = 30;
 		// 速度
 		this.speed_x = 0;
 		this.speed_y = 0;
@@ -129,7 +129,7 @@ window.addEventListener("DOMContentLoaded",function() {
 			if(this.health > 0){
 				// Energyの回復
 				if(this.energy < this.maxEnergy){
-					this.energy++;
+					this.energy += 2;
 				}
 				// Healthの回復
 				if(this.health < this.maxHealth){
@@ -142,8 +142,8 @@ window.addEventListener("DOMContentLoaded",function() {
 
 		// 弾の発射
 		function fireBullet(){
-			if (this.energy - (this.USE_ENERGY*10) >= 0 && this.health > 0 ){
-				this.energy -= (this.USE_ENERGY*10);
+			if (this.energy - (this.USE_ENERGY*20) >= 0 && this.health > 0 ){
+				this.energy -= (this.USE_ENERGY*20);
 				var x = this.x + Math.sin(this.rotation) * 60;
 				var y = this.y - Math.cos(this.rotation) * 60;
 				var id = "bullet" + Math.floor(Math.random()*10000);
