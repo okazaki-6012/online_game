@@ -25,7 +25,7 @@ io.sockets.on('connection', function (socket) {
 			console.log("> " + key + " : " + object_list[u_id]["owner_id"]);
 		}
 		// サーバに保持しているデータを返す
-		io.sockets.socket(socket.id).emit("s2c_Update", {object_list: object_list});
+		socket.emit("s2c_Update", {object_list: object_list});
 	});
 
 	// 受信した情報でオブジェクトをサーバへ追加
@@ -39,7 +39,7 @@ io.sockets.on('connection', function (socket) {
 								   rotation: object.rotation,
 								   health: object.health || 1
 								 };
-		socket.emit("s2c_Update", {object_list: object_list});
+		io.sockets.emit("s2c_Update", {object_list: object_list});
 	});
 
 	// 受信した情報でオブジェクトをサーバから削除
