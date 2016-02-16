@@ -17,7 +17,7 @@ window.addEventListener("DOMContentLoaded",function() {
 					update_objects[key]["y"] = local_objects[key].y;
 				}
 			}
-		} , 500);
+		} , 750);
 
 		// サーバからデータを受け取り更新
 		socket.on("s2c_Update", function (data) {
@@ -166,8 +166,10 @@ window.addEventListener("DOMContentLoaded",function() {
 		// 左右の回転
 		if (keys.left.isDown){
 			this.rotation -= this.ROTATION_SPEED;
+			socket.emit("c2s_Update", update_objects);
 		}else if (keys.right.isDown){
 			this.rotation += this.ROTATION_SPEED;
+			socket.emit("c2s_Update", update_objects);
 		}
 
 		// 加速
@@ -190,6 +192,7 @@ window.addEventListener("DOMContentLoaded",function() {
 		if(this.friction >= 0){
 			this.x += this.speed_x * this.friction || 0;
 			this.y += this.speed_y * this.friction || 0;
+			socket.emit("c2s_Update", update_objects);
 		}
 
 		for(key in local_objects){
@@ -199,6 +202,7 @@ window.addEventListener("DOMContentLoaded",function() {
 						this.health -= this.DAMEGE;
 					else
 						this.health = 0;
+					// あたった弾の削除
 					socket.emit("c2s_RemoveObject", {id: local_objects[key].id});
 				}
 			}
@@ -238,7 +242,6 @@ window.addEventListener("DOMContentLoaded",function() {
 		if ( (this.x < 0 || this.x > this.game.width) || (this.y < 0 || this.y > this.game.height) ){
 			if(this.owner_id == player_id) socket.emit("c2s_RemoveObject", update_objects[this.id]);
 		}
-		
 	};
 
 	function setupKeys (game){
@@ -297,9 +300,9 @@ window.addEventListener("DOMContentLoaded",function() {
 				var pop_up = confirm("もう一度プレイ致しますか？");
 				if (pop_up == true){
 					local_objects[player_id] = new PlayerRocket(game, Math.floor(Math.random()* game.width), Math.floor(Math.random()* game.height), "player", player_id, "user");
+					socket.emit("c2s_Update", update_objects);
 				}
 			}
 		}
-		socket.emit("c2s_Update", update_objects);
 	}
 }, false)
